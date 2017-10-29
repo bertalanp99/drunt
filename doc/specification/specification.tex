@@ -1,0 +1,104 @@
+\documentclass[a4paper]{article}
+
+%%%%%%%%%%%%%%%%
+%%% PACKAGES %%%
+%%%%%%%%%%%%%%%%
+
+% language
+\usepackage{polyglossia}
+
+% header and footer
+\usepackage{fancyhdr}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+%%% PACKAGE CONFIGS %%%
+%%%%%%%%%%%%%%%%%%%%%%%
+
+% polyglossia - set language to Hungarian
+\setdefaultlanguage{magyar}
+
+% fancyhdr - setup
+\fancyhead[L]{prog1 NHF specifikáció}
+\fancyhead[C]{QO7CU6}
+\fancyhead[R]{Péter Bertalan Zoltán}
+\fancyfoot[L]{\today}
+
+% fancyhdr - pagestyle
+\pagestyle{fancy}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% TITLE-AUTHOR-DATE %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\title{Programozás Alapjai 1 --- NHF specifikáció}
+\author{Péter Bertalan Zoltán}
+\date{\today}
+
+\begin{document}
+	\begin{titlepage}
+		\maketitle
+		\vspace{4cm}
+		\begin{center}
+			\Huge
+			\texttt{drunt}
+		\end{center}
+		\vspace{1cm}
+		\begin{abstract}
+			Konfigurálható, flexibilis határidőnapló és naptár, alkalmi használatra tervezve
+		\end{abstract}
+	\end{titlepage}
+
+	\section{Alapvető leírás}
+	
+	A \textit{drunt} egy klasszikus naptár. Naptári események létrehozására, módosítására, törlésére alkalmas. A fejlesztő céljai közé tartozik a rugalmasság, hordozhatóság, illetve a felhasználóbarát kezelhetőség. Az utóbbi céljából a program használható grafikus kezelőfelülettel (továbbiakban GUI) is, de alapvetően szöveges, parancssor alapú (továbbiakban CLI).
+	
+	\section{Feladatok, használat}
+	
+	\begin{itemize}
+		\item a személyes naptár fájlba mentése és annak a program indulásakor betöltése
+		\item események...
+			\begin{itemize}
+				\item létrehozása
+				\item módosítása
+				\item törlése
+			\end{itemize}
+		\item az események részletei:
+			\begin{itemize}
+				\item név
+				\item idő (időintervallum)
+				\item helyszín
+				\item leírás
+			\end{itemize}
+		\item naptárak importálása és exportálása (egyedi módon struktúrált szöveges \texttt{.txt} fájl (remélhetőleg sikerül egy \texttt{.ics} (iCalendar) formátumot támomgató program elkészítése is)
+			\begin{itemize}
+				\item például naptárunk mellé importálhatunk egy internetről letöltött névnapokat tartalmazó naptár fájlt és a \textit{drunt} a naptár kijelzésekor a névnapokat is jelzi majd nekünk
+			\end{itemize}
+		\item konfigurálhatóság (a program futása közben vagy előre, a konfigurációs fájlban állítható, hogy milyen nyelvű legyen a program (angol/magyar), milyen nappal kezdődjön a hét (vasárnap/hétfő); a beállítás menthető)
+		\item lehetőség CLI és GUI mód használatára is
+		\item év, hónap, illetve nap szerinti, naptárszerű listázása az eseményeknek (a naptár kijelzése)
+		\item keresés a naptári események között
+	\end{itemize}
+
+	\section{Használat}
+	
+	\begin{itemize}
+		\item[a)] CLI mód
+			\begin{itemize}
+				\item jellemzően a program futtatásakor (amennyiben nem adunk meg opcionális argumentumokat) interaktív módba kerülünk
+				\item interaktív módban egyszerű szöveges parancsokkal utasíthatjuk a programot, hogy azt tegye, amit szeretnénk
+					\begin{itemize}
+						\item például egy esemény hozzáadása kinézhet úgy, hogy interaktív módba lépés után kiadjuk az \texttt{add event} parancsot, majd a program sorban megkérdez minket az esemény nevéről, idejéről, etc.
+					\end{itemize}
+				\item CLI módban is elég felhasználóbarát a felület ahhoz, hogy ne kelljen ,,betanulni'' a használatot (a program jelzi, milyen lehetőségeink vannak, végigvezet a folyamatokon, funkciókon (mint például keresés a naptárban))
+			\end{itemize}
+		\item[b)] GUI mód
+			\begin{itemize}
+				\item GUI módban a program kezelése nem igényel sok magyaráznivalót: jól megszokott gombokkal, szövegdobozokkal, jelölőnégyzetekkel találkozunk
+				\item Például egy új esemény hozzáadása úgy történik, hogy klikkelünk a naptár kijelzésben az adott nap számára, majd egy gombra, amelyre olyasmi van írva, hogy ,,új''. Ennek megnyomására párbeszédablak ugrik fel, ahol megadhatjuk az esemény paramétereit, majd az ,,ok'' gombot megnyomva elmenthetjük azt. Egyszerű, mint az egyszeregy.
+			\end{itemize}	
+	\end{itemize}
+	
+
+
+	
+\end{document}
