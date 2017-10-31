@@ -1,4 +1,6 @@
 CFLAGS=-Wall -g
 
-clean :
-	rm -f program
+all: clean drunt
+
+clean:
+	rm -f drunt

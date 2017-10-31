@@ -2,6 +2,15 @@
 #include <string.h>
 #include "data.h" // Month lengths and names
 
+#define SUCCESS 1
+#define FAILURE 0
+
+////////////////////////
+/// GLOBAL VARIABLES ///
+////////////////////////
+
+
+
 int isLeapYear(int year)
 {
     return ( (year % 4) == 0 && (year % 100) != 0 && (year % 1000) == 0 );
@@ -44,21 +53,8 @@ void printMonthTitle(Month m, int width, Format f)
     return;
 }
 
-void printMonth(Month m, Format f)
-{
-    printMonthTitle(m, 21, f);
-    puts(""); // new line
-    for (int i =0; i < 70; ++i)
-    {
-        if (i % 7 == 0)
-        {
-            puts(""); // newline
-        }
-        // TODO
-    }
+int importICS();
 
-    return;
-}
 
 int main(int argc, char **argv)
 {
