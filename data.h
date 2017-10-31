@@ -66,13 +66,11 @@ typedef struct {
 typedef struct {
     DateTime start;
     DateTime end;
-    char[1024] name;
-    char[1024] location;
-    char[8192] description;
+    char name[1024];
+    char location[1024];
+    char description[8192];
     int priority;
 } Event;
-
-
 
 /////////////////////
 /// ARRAY SECTION ///
@@ -107,3 +105,5 @@ MonthName MonthNames[12] = {
     { "November"    ,   "Nov" },
     { "December"    ,   "Dec" }
 };
+
+//Event eventList[];

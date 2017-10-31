@@ -9,8 +9,6 @@
 /// GLOBAL VARIABLES ///
 ////////////////////////
 
-
-
 int isLeapYear(int year)
 {
     return ( (year % 4) == 0 && (year % 100) != 0 && (year % 1000) == 0 );
@@ -53,17 +51,40 @@ void printMonthTitle(Month m, int width, Format f)
     return;
 }
 
-int importICS();
+int readICS(char* path) 
+{
+    char buff[255]; // TODO better implementation?
+    FILE* fp;
+    fp = fopen(path, "r");
+    
+    int eventCounter = 0;
+    
+    fgets(buff, 255, (FILE*) fp);
+    while(strcmp(buff, "END:VCALENDAR"))
+    {
+        // we have not yet reached the end
+        if (!strcmp(buff, "BEGIN:VEVENT"))
+        {
+            eventCounter++;
+        }
+
+        // read next line
+        fgets(buff, 255, (FILE*) fp);
+    }
+
+    // debug command
+    printf("%d\n", eventCounter);
+    
+    fclose(fp);
+    
+    return 0;
+}
 
 
 int main(int argc, char **argv)
 {
-    /*for (int i = 0; i < 12; ++i)
-    {
-        printf("Long: %s\t| Short: %s\n", MonthNames[i].longName, MonthNames[i].shortName);
-    }
-    */
-
+    // PRINT MONTH TITLES
+    /*
     for (Month m = January; m <= December; ++m)
     {
         printMonthTitle(m, 21, Short);
@@ -77,7 +98,12 @@ int main(int argc, char **argv)
         printMonthTitle(m, 21, Long);
         putchar('\n');
     }
-    
+    */
+
+    // PRINT NUMBER OF EVENTS
+
+    printf("%d\n", readICS("./cal.ics")); 
+
     return 0;
 }
 
