@@ -59,25 +59,25 @@ int readICS(char* path)
     
     int eventCounter = 0;
     
-    fgets(buff, 255, (FILE*) fp);
-    while(strcmp(buff, "END:VCALENDAR"))
+    fgets(buff, 255, fp);
+    while(strcmp(buff, "END:VCALENDAR\n") != 0)
     {
         // we have not yet reached the end
-        if (!strcmp(buff, "BEGIN:VEVENT"))
+        if (strcmp(buff, "BEGIN:VEVENT\n") == 0)
         {
             eventCounter++;
         }
 
         // read next line
-        fgets(buff, 255, (FILE*) fp);
+        fgets(buff, 255, fp);
     }
 
-    // debug command
-    printf("%d\n", eventCounter);
+    // TODO remove from complete programme
+    // printf("%d\n", eventCounter);
     
     fclose(fp);
     
-    return 0;
+    return 1;
 }
 
 
@@ -102,7 +102,7 @@ int main(int argc, char **argv)
 
     // PRINT NUMBER OF EVENTS
 
-    printf("%d\n", readICS("./cal.ics")); 
+    printf("Result of reading ics: %d\n", readICS("./cal.ics")); 
 
     return 0;
 }
