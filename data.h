@@ -105,5 +105,3 @@ MonthName MonthNames[12] = {
     { "November"    ,   "Nov" },
     { "December"    ,   "Dec" }
 };
-
-//Event* eventList[];

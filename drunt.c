@@ -60,12 +60,12 @@ int readICS(char* path)
     int eventCounter = 0;
     
     fgets(buff, 255, fp);
-    while(strcmp(buff, "END:VCALENDAR\n") != 0)
+    while (strcmp(buff, "END:VCALENDAR\n") != 0) // use strncmp instead?
     {
         // we have not yet reached the end
         if (strcmp(buff, "BEGIN:VEVENT\n") == 0)
         {
-            eventCounter++;
+            ++eventCounter;
         }
 
         // read next line
@@ -76,8 +76,23 @@ int readICS(char* path)
     // printf("%d\n", eventCounter);
     
     fclose(fp);
+
+    Event EventList[eventCounter]; // declaring event array
+
+    fp = fopen(path, "r");
+
+    int i = 0;
+
+    fgets(buff, 255, fp);
+    while (strcmp(buff, "END:VCALENDAR\n") != 0)
+    {
+        if (strncmp(buff, "DTSTART", strlen("DTSTART")) == 0)
+        {
+            // TODO timestamp reader
+        }
+    }
     
-    return 1;
+    return SUCCESS;
 }
 
 
