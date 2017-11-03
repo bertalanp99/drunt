@@ -14,7 +14,7 @@ int isLeapYear(int year)
     return ( (year % 4) == 0 && (year % 100) != 0 && (year % 1000) == 0 );
 }
 
-void printMonthTitle(Month m, int width, Format f)
+int printMonthTitle(Month m, int width, Format f)
 {
     if (f == Short)
     {
@@ -46,9 +46,55 @@ void printMonthTitle(Month m, int width, Format f)
     }
     else
     {
-        printf("Error!"); // TODO error handling
+        return FAILURE;
     }
-    return;
+    
+    return SUCCESS;
+}
+
+typedef enum {
+    STRTOINT_SUCCESS,
+    STRTOINT_OVERFLOW,
+    STRTOINT_UNDERFLOW,
+    STRTOINT_INCONVERTIBLE
+} strToInt_errno
+
+
+// Borrowed from StackOverflow (q/7021725/686070)
+// @param[out] out: result of the conversion, cannot be NULL
+// @param[in]  str: string to be converted, cannot be NULL
+// @param[in]  base: base to interpret the string in (2:36)
+// 
+// The following are inconvertible:
+//      - empty string
+//      - leading whitespace
+//      - trailing characters that are not part of the number
+//
+// @return: indicates whether the conversion has succeeded or why it has failed
+strToInt_errno strToInt(int* out, char* str, int base)
+{
+    char* end;
+    if (str[0] == '\0' || isspace((unsigned char) str[0])) // empty string or leading whitespace
+    {
+        return STRTOINT_INCONVERTIBLE
+    }
+
+    errno = 0; // ???
+    
+    long l = strtol(s, &end, base); // strol function: ???
+    if ( l > INT_MAX || (errno == ERANGE && l == LONG_MAX) )
+    {
+        return STRTOINT_OVERFLOW;
+    } // checks whether input is larger than INT_MAX
+    if (
+    
+
+DateTime readTimestamp(char* timestamp)
+{
+    DateTime out;
+    char year[4];
+    strncpy(year, timestamp, 4);
+    (out.date).year = (int) year;
 }
 
 int readICS(char* path) 
