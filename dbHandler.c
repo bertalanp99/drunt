@@ -205,8 +205,8 @@ int entry_add(Calendar* cal, const Event e) // TODO update fnctn info
        return 0; // caller should check for this
     }
 
-    /* Reallocate memory for events in cal, adding more space for another entry */
-    Event* tmp = realloc( cal->events, (sizeof(*(cal->events)) + sizeof(Event)) );
+    /* Reallocate memory for events array in cal, adding more space for another entry */
+    Event* tmp = realloc( cal->events, (sizeof(Event) * cal->numberOfEntries) + sizeof(Event) );
     // only reassign pointer to cal if reallocating has been successful (so as to prevent losing pointer upon unsuccessful reallocation)
     if (tmp != NULL)
     {

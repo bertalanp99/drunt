@@ -13,7 +13,7 @@ int main(int argc, char *argv[])
         Calendar mycalendar = ics_load("./cal.ics");
         printRawCalendar(mycalendar);
         free(mycalendar.events);
-    }
+   }
     else if (strcmp(argv[1], "--add") == 0 || strcmp(argv[1], "-a") == 0)
     {
         // TODO event adder
