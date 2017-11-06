@@ -11,6 +11,6 @@ int myatoi(const char*, int*);
 
 char* icsTagRemover(char*, char*);
 
-int promptYN(char*);
+int promptYN(char*, ...);
 
 #endif

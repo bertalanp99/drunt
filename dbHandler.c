@@ -1,6 +1,7 @@
 #include "dbHandler.h"
 #include "errorHandler.h"
 #include "helper.h"
+#include "enums.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,11 +15,9 @@ Calendar ics_load(char* file)
 {
     FILE* fp;
     fp = fopen(file, "r");
-
-    // check whether file even exists
     if (fp == NULL)
     {
-        die("ics file does not exist");
+        die("Unable to open file for reading: %s", file);
     }
 
     char buff[MAX_LINELENGTH];
@@ -29,7 +28,7 @@ Calendar ics_load(char* file)
     // check whether file is empty
     if (fgets(buff, MAX_LINELENGTH, fp) == NULL)
     {
-        die("ics file is empty");
+        die("ics file (%s) is empty", file);
     }
 
     // TODO implement other sorts of iCalendar entries (e.g. VTODO)
@@ -40,6 +39,14 @@ Calendar ics_load(char* file)
         {
             ++count;
         }
+        
+        // prevent infinite loop by also checking for EOF
+        if (feof(fp))
+        {
+            warning("%s contains no %s! Last line read was\n\t%s", file, "END:VCALENDAR", buff);
+            break;
+        }
+        
         fgets(buff, MAX_LINELENGTH, fp);
     }
 
@@ -47,42 +54,48 @@ Calendar ics_load(char* file)
 
     // ---
     
-    fp = fopen(file, "r"); // no need to check for NULL pointer, already done
+    fp = fopen(file, "r");
+    if (fp == NULL)
+    {
+        die("Unable to open file for reading: %s", file);
+    }
 
     /* Then create and fill database with ics contents */
-    // allocate memory for events and database
     Event* tmp = malloc( count * sizeof(Event) );
-    // check whether memeory allocation was successful
     if (tmp == NULL)
     {
         die("Failed to allocate memory for database");
     }
+    
+    // initialise calendar
     Calendar cal = {.numberOfEntries = count, .events = tmp};
 
-    int i = -1; // index of current event
+    int i = -1; // index of current event; initialised to -1 because first event shall be at index 0
+    int currentLine = 0; // store number of currently read line so that it can be referenced in case of errors
 
+    ++currentLine;
     fgets(buff, MAX_LINELENGTH, fp); // no need to check for empty file, already done
     while (strncmp(buff, "END:VCALENDAR", strlen("END:VCALENDAR")) != 0)
     {
-        if (strncmp(buff, "BEGIN:VEVENT", strlen("BEGIN:VEVENT")) == 0) // TODO IMPROVE THESE WITH ENUM
+        if (strncmp(buff, "BEGIN:VEVENT", strlen("BEGIN:VEVENT")) == 0)
         {
             ++i;
         }
-        else if (strncmp(buff, "DTSTART", strlen("DTSTART")) == 0 && i != -1) // From date (+time)
+        else if (strncmp(buff, "DTSTART", strlen("DTSTART")) == 0 && i != -1) // 'from' date (+time)
         {
             char* miniBuff = icsTagRemover(buff, "DTSTART");
             if (icsTimeStampReader(miniBuff, &cal.events[i].start) == 0)
             {
-                die("Corrupt ics file (invalid DTSTART somewhere)");
+                die("Corrupt ics file (invalid %s at %s:%d)", "DTSTART", file, currentLine);
             }
             free(miniBuff);
         }
-        else if (strncmp(buff, "DTEND", strlen("DTEND")) == 0 && i != -1)  // To date (+time)
+        else if (strncmp(buff, "DTEND", strlen("DTEND")) == 0 && i != -1)  // 'to' date (+time)
         {
             char* miniBuff = icsTagRemover(buff, "DTEND");
             if (icsTimeStampReader(miniBuff, &cal.events[i].end) == 0)
             {
-                die("Corrupt ics file (invalid DTEND somewhere)");
+                die("Corrupt ics file (invalid %s at %s:%d)", "DTEND", file, currentLine);
             }
             free(miniBuff);
         }
@@ -91,7 +104,7 @@ Calendar ics_load(char* file)
             char* miniBuff = icsTagRemover(buff, "SUMMARY");
             if (miniBuff == NULL)
             {
-                die("Corrupt ics file (invalid SUMMARY somewhere)");
+                die("Corrupt ics file (invalid %s at %s:%d)", "SUMMARY", file, currentLine);
             }
             strcpy(cal.events[i].name, miniBuff);
             free(miniBuff);
@@ -101,7 +114,7 @@ Calendar ics_load(char* file)
             char* miniBuff = icsTagRemover(buff, "LOCATION");
             if (miniBuff == NULL)
             {
-                die("Corrupt ics file (invalid LOCATION somewhere)");
+                die("Corrupt ics file (invalid %s at %s:%d)", "LOCATION", file, currentLine);
             }
             strcpy(cal.events[i].location, miniBuff);
             free(miniBuff);
@@ -111,7 +124,7 @@ Calendar ics_load(char* file)
             char* miniBuff = icsTagRemover(buff, "DESCRIPTION");
             if (miniBuff == NULL)
             {
-                die("Corrupt ics file (invalid DESCRIPTION somewhere)");
+                die("Corrupt ics file (invalid %s at %s:%d)", "DESCRIPTION", file, currentLine);
             }
             strcpy(cal.events[i].description, miniBuff);
             free(miniBuff);
@@ -121,18 +134,27 @@ Calendar ics_load(char* file)
             char* miniBuff = icsTagRemover(buff, "PRIORITY");
             if (miniBuff == NULL)
             {
-                die("Corrupt ics file (invalid PRIORITY somewhere (empty))");
+                die("Corrupt ics file (invalid %s at %s:%d)", "PRIORITY", file, currentLine);
             }
             int priority;
             if (myatoi(miniBuff, &priority) == 0)
             {
-                die("Corrupt ics file (invalid PRIORITY somewhere (unable to interpret))");
+                die("Corrupt ics file (invalid %s at %s:%d)", "PRIORITY", file, currentLine);
             }
             cal.events[i].priority = priority;
             free(miniBuff);
         }
-     
-        fgets(buff, MAX_LINELENGTH, fp); // next line
+        
+        // prevent infinite loop by also checking for EOF
+        if (feof(fp))
+        {
+            warning("%s contains no %s! Last line read was\n\t%s", file, "END:VCALENDAR", buff);
+            break;
+        }
+        
+        // advance
+        ++currentLine;
+        fgets(buff, MAX_LINELENGTH, fp);
     }
 
     fclose(fp);
@@ -140,12 +162,22 @@ Calendar ics_load(char* file)
     return cal;
 }
     
-int ics_write(Calendar* cal, char* file)
+MYERRNO ics_write(Calendar* cal, char* file)
 {
-    /* First of all, check if file exists by any chance */
+    /* First of all, check if file exists --- if it does, ask whether to overwrite */
     if (access(file, 0) == 0)
     {
-        return 0; // caller should check for this
+        if (promptYN("File %s already exists. Overwrite?", file) == 0)
+        {
+            return FAIL_PROMPT;
+        }
+        else
+        {
+            if (remove(file) != 0)
+            {
+                return FAIL_REMOVE;
+            }
+        }
     }
     
     /* Open up the file for writing */
@@ -153,7 +185,7 @@ int ics_write(Calendar* cal, char* file)
     fp = fopen(file, "w");
     if (fp == NULL)
     {
-        return 0;
+        return FAIL_FOPEN;
     }
     
     /* Printing basic iCalendar stuff first */
@@ -194,27 +226,26 @@ int ics_write(Calendar* cal, char* file)
 
     fclose(fp);
 
-    return 1;
+    return SUCCESS;
 }
 
-int entry_add(Calendar* cal, const Event e) // TODO update fnctn info
+MYERRNO entry_add(Calendar* cal, const Event e)
 {
     /* First, make sure Calendar pointer wasn't NULL */
     if (cal == NULL)
     {
-       return 0; // caller should check for this
+       return FAIL_NULLPASSED;
     }
 
     /* Reallocate memory for events array in cal, adding more space for another entry */
     Event* tmp = realloc( cal->events, (sizeof(Event) * cal->numberOfEntries) + sizeof(Event) );
-    // only reassign pointer to cal if reallocating has been successful (so as to prevent losing pointer upon unsuccessful reallocation)
     if (tmp != NULL)
     {
         cal->events = tmp;
     }
     else
     {
-        return 0; // caller should check for this
+        return FAIL_REALLOC;
     }
 
     /* Writing input event details into newly allocated extra space */
@@ -230,5 +261,42 @@ int entry_add(Calendar* cal, const Event e) // TODO update fnctn info
     /* Increase number of entries value in structure and return pointer */
     ++cal->numberOfEntries;
     
-    return 1;
+    return SUCCESS;
 }
+
+// TODO credit tutorial on http://www.zentut.com/c-tutorial/c-linked-list/
+
+EventNode* EventNode_create(Event data, EventNode* next) // add node to linked list
+{
+    EventNode* new = malloc( sizeof(EventNode) );
+    if (new == NULL)
+    {
+        die("Failed to allocate memory");
+    }
+
+    new->data = data;
+    new->next = next;
+
+    return new;
+}
+
+EventNode* EventNode_prepend(EventNode* head, Event data)
+{
+    EventNode* new = EventNode_create(data, head);
+    head = new;
+    return head;
+}
+
+typedef void (*callback)(EventNode* data);
+void traverse(EventNode* head, callback f)
+{
+    EventNode* cursor = head;
+    while (cursor != NULL)
+    {
+        f(cursor);
+        cursor = cursor->next;
+    }
+}
+
+// TODO CONTINUE FROM HERE
+

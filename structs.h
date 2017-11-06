@@ -31,6 +31,11 @@ typedef struct {
     int priority;
 } Event;
 
+typedef struct EventNode_s {
+    Event data;
+    struct EventNode_s next;
+} EventNode;
+
 typedef struct {
     char longName[10];
     char shortName[4];
@@ -39,7 +44,7 @@ typedef struct {
 /* Databases */
 typedef struct {
     int numberOfEntries;
-    Event* events;
+    EventNode EventNodeHead;
 } Calendar;
 
 #endif

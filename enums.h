@@ -30,7 +30,7 @@ typedef enum {
     sep,
     oct,
     nov,
-    dev
+    dec
 } Month; // TODO use this
 
 // ---------------------
@@ -40,11 +40,15 @@ typedef enum {
     Long
 } Format;
 
+/* Function ERRNOs */
+
 typedef enum {
-    DIE_PROMPT,
-    DIE_REMOVEFAILURE,
-    DIE_FOPENFAILURE,
+    FAIL_PROMPT,
+    FAIL_REMOVE,
+    FAIL_FOPEN,
+    FAIL_NULLPASSED,
+    FAIL_REALLOC,
     SUCCESS
-} ICS_WRITE_ERRNO;
+} MYERRNO;
 
 #endif

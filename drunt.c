@@ -10,7 +10,7 @@ int main(int argc, char *argv[])
 {
     if (strcmp(argv[1], "--list") == 0 || strcmp(argv[1], "-l") == 0)
     {
-        Calendar mycalendar = ics_load("./cal.ics");
+        Calendar mycalendar = ics_load("cal.ics");
         printRawCalendar(mycalendar);
         free(mycalendar.events);
    }
@@ -20,7 +20,7 @@ int main(int argc, char *argv[])
     }
     else if (strcmp(argv[1], "-temp") == 0)
     {
-        Calendar mycalendar = ics_load("./cal.ics");
+        Calendar mycalendar = ics_load("cal.ics");
         Event myevent = {
             .start ={   .date = {   .year = 2017,
                                     .month = 12,
@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
             die("Fuck! Event adder did not work");
         }
 
-        if(ics_write(&mycalendar, "./newCal.ics") == 0)
+        if(ics_write(&mycalendar, "newCal.ics") == 0)
         {
             die("File already exists");
         }
@@ -58,8 +58,8 @@ int main(int argc, char *argv[])
     }
     else if (strcmp(argv[1], "-temp2") == 0) // load & write
     {
-        Calendar mycalendar = ics_load("./cal.ics");
-        if (ics_write(&mycalendar, "./newCal.ics") == 0)
+        Calendar mycalendar = ics_load("cal.ics");
+        if (ics_write(&mycalendar, "newCal.ics") == 0)
         {
             die("File already exists");
         }

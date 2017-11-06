@@ -2,11 +2,12 @@
 #define DBHANDLER_H__
 
 #include "structs.h"
+#include "enums.h"
 
 Calendar ics_load(char*);
 
-int ics_write(Calendar*, char*);
+MYERRNO ics_write(Calendar*, char*);
 
-int entry_add(Calendar*, const Event);
+MYERRNO entry_add(Calendar*, const Event);
 
 #endif

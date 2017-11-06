@@ -1,13 +1,17 @@
 #include "helper.h"
+#include "errorHandler.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <limits.h>
 #include <string.h>
+#include <stdarg.h>
 
 #define YEAR_MIN 1950
 #define YEAR_MAX 2050
+
+#define BUFFSIZE 256
 
 int isLeapYear(const int year)
 {
@@ -150,11 +154,27 @@ char* icsTagRemover(char* line, char* tag)
     return out;
 }
     
-int promptYN(char* message)
+int promptYN(char* message, ...)
 {
+    /* Handle parameters */
+    char buff[BUFFSIZE];
+    va_list args;
+    va_start(args, message);
+    int rc = vsnprintf(buff, sizeof buff, message, args);
+    va_end(args);
+
+    if (rc == 0)
+    {
+        warning("Function promptYN() failed to format string! Unformatted message follows\n");
+        printf("%s [y/n] ", message);
+    }
+    else
+    {
+        printf("%s [y/n] ", buff);
+    }
+
     char response;
-    printf("%s [y/n] ", message);
-    scanf("%c", &response);
+    scanf(" %c", &response);
     switch (response)
     {
         case 'y':
@@ -166,7 +186,7 @@ int promptYN(char* message)
             break;
 
         default:
-            return -1; // invalid response --- caller should check for this
-            break;
+            printf("Invalid choice: %c", response);
+            return 0;
     }
 }
