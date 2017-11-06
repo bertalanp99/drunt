@@ -40,4 +40,11 @@ typedef enum {
     Long
 } Format;
 
+typedef enum {
+    DIE_PROMPT,
+    DIE_REMOVEFAILURE,
+    DIE_FOPENFAILURE,
+    SUCCESS
+} ICS_WRITE_ERRNO;
+
 #endif

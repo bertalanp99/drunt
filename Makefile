@@ -9,3 +9,4 @@ drunt: dbHandler.o debug.o errorHandler.o helper.o
 clean:
 	rm -vf drunt
 	rm -vf *.o
+	rm -vf newCal.ics

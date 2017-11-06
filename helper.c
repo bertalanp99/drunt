@@ -1,5 +1,6 @@
 #include "helper.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <limits.h>
@@ -139,9 +140,9 @@ char* icsTagRemover(char* line, char* tag)
         return NULL;
     }
     
-    char* out = malloc( (strlen(line) - strlen(tag) - 1 + 1) * sizeof(char) ); // -1: colon between tag and value; +1: closing 0
+    char* out = malloc( (strlen(line) - strlen(tag) - 2 + 1) * sizeof(char) ); // -2: colon between tag and value and \n at end; +1: closing 0
     int i = 0; // itetator for out
-    for (int j = strlen(tag) + 1 + 1; line[j] != '\0'; ++j)
+    for (int j = strlen(tag) + 1; line[j] != '\n'; ++j) 
     {
         out[i++] = line[j];
     }
@@ -149,4 +150,23 @@ char* icsTagRemover(char* line, char* tag)
     return out;
 }
     
+int promptYN(char* message)
+{
+    char response;
+    printf("%s [y/n] ", message);
+    scanf("%c", &response);
+    switch (response)
+    {
+        case 'y':
+            return 1;
+            break;
 
+        case 'n':
+            return 0;
+            break;
+
+        default:
+            return -1; // invalid response --- caller should check for this
+            break;
+    }
+}

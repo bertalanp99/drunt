@@ -5,11 +5,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
-#define MAX_LINELENGTH 256
+#define MAX_LINELENGTH 256 // ics allows 75 octets
+#define ICALVERSION "2.0"
 
 // this function loads the default ics file into the array of events (in the RAM)
-Calendar* ics_load(char* file, Calendar* cal)
+Calendar* ics_load(char* file)
 {
     FILE* fp;
     fp = fopen(file, "r");
@@ -45,12 +47,13 @@ Calendar* ics_load(char* file, Calendar* cal)
     fclose(fp);
 
     // ---
-
+    
     fp = fopen(file, "r"); // no need to check for NULL pointer, already done
 
     /* Then create and fill database with ics contents */
     // allocate memory for database
-    cal = malloc( count * sizeof(Event) + count * sizeof(int));
+    //Calendar* cal = malloc( count * sizeof(Event) + count * sizeof(int));
+    Calendar* cal = calloc(count, (sizeof(Event) + sizeof(int))); // TODO MAKE MALLOCATOR FUNCTION
 
     // check whether memeory allocation was successful
     if (cal == NULL)
@@ -66,7 +69,7 @@ Calendar* ics_load(char* file, Calendar* cal)
     fgets(buff, MAX_LINELENGTH, fp); // no need to check for empty file, already done
     while (strncmp(buff, "END:VCALENDAR", strlen("END:VCALENDAR")) != 0)
     {
-        if (strncmp(buff, "BEGIN:VEVENT", strlen("BEGIN:VEVENT")) == 0)
+        if (strncmp(buff, "BEGIN:VEVENT", strlen("BEGIN:VEVENT")) == 0) // TODO IMPROVE THESE WITH ENUM
         {
             ++i;
         }
@@ -82,7 +85,7 @@ Calendar* ics_load(char* file, Calendar* cal)
         else if (strncmp(buff, "DTEND", strlen("DTEND")) == 0 && i != -1)  // To date (+time)
         {
             char* miniBuff = icsTagRemover(buff, "DTEND");
-            if (icsTimeStampReader(miniBuff, &cal->events[i].start) == 0)
+            if (icsTimeStampReader(miniBuff, &cal->events[i].end) == 0)
             {
                 die("Corrupt ics file (invalid DTEND somewhere)");
             }
@@ -100,7 +103,7 @@ Calendar* ics_load(char* file, Calendar* cal)
         }
         else if (strncmp(buff, "LOCATION", strlen("LOCATION")) == 0 && i != -1) // location of event
         {
-            char* miniBuff = icsTagRemover(buff, "SUMMARY");
+            char* miniBuff = icsTagRemover(buff, "LOCATION");
             if (miniBuff == NULL)
             {
                 die("Corrupt ics file (invalid LOCATION somewhere)");
@@ -133,6 +136,8 @@ Calendar* ics_load(char* file, Calendar* cal)
             cal->events[i].priority = priority;
             free(miniBuff);
         }
+     
+        fgets(buff, MAX_LINELENGTH, fp); // next line
     }
 
     fclose(fp);
@@ -140,4 +145,95 @@ Calendar* ics_load(char* file, Calendar* cal)
     return cal;
 }
     
+int ics_write(Calendar* cal, char* file)
+{
+    /* First of all, check if file exists by any chance */
+    if (access(file, 0) == 0)
+    {
+        return 0; // caller should check for this
+    }
+    
+    /* Open up the file for writing */
+    FILE* fp;
+    fp = fopen(file, "w");
+    if (fp == NULL)
+    {
+        return 0;
+    }
+    
+    /* Printing basic iCalendar stuff first */
+    fprintf(fp, "BEGIN:VCALENDAR\n"); 
+    fprintf(fp, "VERSION:%s\n", ICALVERSION);
+    
+    /* Printing every event, one by one */
+    for (int i = 0; i < cal->numberOfEntries; ++i)
+    { // TODO write stuff only if they exist
+        fprintf(fp, "BEGIN:VEVENT\n");
+        fprintf
+            (
+                fp, "DTSTART:%04d%02d%02dT%02d%02d00\n",
+                cal->events[i].start.date.year,
+                cal->events[i].start.date.month,
+                cal->events[i].start.date.day,
+                cal->events[i].start.time.hour,
+                cal->events[i].start.time.minute
+            );
+        fprintf
+            (
+                fp, "DTEND:%04d%02d%02dT%02d%02d00\n",
+                cal->events[i].end.date.year,
+                cal->events[i].end.date.month,
+                cal->events[i].end.date.day,
+                cal->events[i].end.time.hour,
+                cal->events[i].end.time.minute
+            );
+        fprintf(fp, "SUMMARY:%s\n", cal->events[i].name);
+        fprintf(fp, "LOCATION:%s\n", cal->events[i].location);
+        fprintf(fp, "DESCRIPTION:%s\n", cal->events[i].description);
+        fprintf(fp, "PRIORITY:%d\n", cal->events[i].priority);
+        fprintf(fp, "END:VEVENT\n");
+    }
 
+    /* Close whole iCalendar file */
+    fprintf(fp, "END:VCALENDAR");
+
+    fclose(fp);
+
+    return 1;
+}
+
+Calendar* entry_add(Calendar* cal, const Event e)
+{
+    /* First, make sure Calendar pointer wasn't NULL */
+    if (cal == NULL)
+    {
+       return NULL; // caller should check for this
+    }
+
+    /* Reallocate memory for cal, adding 'space' for another entry */
+    Calendar* tmp = realloc( cal, (sizeof(*cal) + sizeof(Event)) );
+    // only reassign pointer to cal if reallocating has been successful (so as to prevent losing pointer upon unsuccessful reallocation)
+    if (tmp != NULL)
+    {
+        cal = tmp;
+    }
+    else
+    {
+        return NULL; // caller should check for this
+    }
+
+    /* Writing input event details into newly allocated extra space */
+    cal->events[cal->numberOfEntries].start = e.start;
+    cal->events[cal->numberOfEntries].end = e.end;
+    
+    strcpy(cal->events[cal->numberOfEntries].name, e.name);
+    strcpy(cal->events[cal->numberOfEntries].location, e.location);
+    strcpy(cal->events[cal->numberOfEntries].description, e.description);
+
+    cal->events[cal->numberOfEntries].priority = e.priority;
+
+    /* Increase number of entries value in structure and return pointer */
+    ++cal->numberOfEntries;
+    
+    return cal;
+}
