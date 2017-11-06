@@ -3,7 +3,7 @@
 
 #include "structs.h"
 
-void printRawCalendar(Calendar*);
+void printRawCalendar(Calendar);
 
 void printRawEvent(Event);
 

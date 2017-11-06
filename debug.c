@@ -2,11 +2,11 @@
 
 #include <stdio.h>
 
-void printRawCalendar(Calendar* cal)
+void printRawCalendar(Calendar cal)
 {
-    for (int i = 0; i < cal->numberOfEntries; ++i)
+    for (int i = 0; i < cal.numberOfEntries; ++i)
     {
-        printRawEvent(cal->events[i]);
+        printRawEvent(cal.events[i]);
         printf("\n");
     }
 }

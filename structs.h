@@ -39,7 +39,7 @@ typedef struct {
 /* Databases */
 typedef struct {
     int numberOfEntries;
-    Event events[];
+    Event* events;
 } Calendar;
 
 #endif

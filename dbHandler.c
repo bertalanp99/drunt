@@ -10,8 +10,7 @@
 #define MAX_LINELENGTH 256 // ics allows 75 octets
 #define ICALVERSION "2.0"
 
-// this function loads the default ics file into the array of events (in the RAM)
-Calendar* ics_load(char* file)
+Calendar ics_load(char* file)
 {
     FILE* fp;
     fp = fopen(file, "r");
@@ -51,18 +50,14 @@ Calendar* ics_load(char* file)
     fp = fopen(file, "r"); // no need to check for NULL pointer, already done
 
     /* Then create and fill database with ics contents */
-    // allocate memory for database
-    //Calendar* cal = malloc( count * sizeof(Event) + count * sizeof(int));
-    Calendar* cal = calloc(count, (sizeof(Event) + sizeof(int))); // TODO MAKE MALLOCATOR FUNCTION
-
+    // allocate memory for events and database
+    Event* tmp = malloc( count * sizeof(Event) );
     // check whether memeory allocation was successful
-    if (cal == NULL)
+    if (tmp == NULL)
     {
         die("Failed to allocate memory for database");
     }
-    
-    // add number of entries to database
-    cal->numberOfEntries = count;
+    Calendar cal = {.numberOfEntries = count, .events = tmp};
 
     int i = -1; // index of current event
 
@@ -76,7 +71,7 @@ Calendar* ics_load(char* file)
         else if (strncmp(buff, "DTSTART", strlen("DTSTART")) == 0 && i != -1) // From date (+time)
         {
             char* miniBuff = icsTagRemover(buff, "DTSTART");
-            if (icsTimeStampReader(miniBuff, &cal->events[i].start) == 0)
+            if (icsTimeStampReader(miniBuff, &cal.events[i].start) == 0)
             {
                 die("Corrupt ics file (invalid DTSTART somewhere)");
             }
@@ -85,7 +80,7 @@ Calendar* ics_load(char* file)
         else if (strncmp(buff, "DTEND", strlen("DTEND")) == 0 && i != -1)  // To date (+time)
         {
             char* miniBuff = icsTagRemover(buff, "DTEND");
-            if (icsTimeStampReader(miniBuff, &cal->events[i].end) == 0)
+            if (icsTimeStampReader(miniBuff, &cal.events[i].end) == 0)
             {
                 die("Corrupt ics file (invalid DTEND somewhere)");
             }
@@ -98,7 +93,7 @@ Calendar* ics_load(char* file)
             {
                 die("Corrupt ics file (invalid SUMMARY somewhere)");
             }
-            strcpy(cal->events[i].name, miniBuff);
+            strcpy(cal.events[i].name, miniBuff);
             free(miniBuff);
         }
         else if (strncmp(buff, "LOCATION", strlen("LOCATION")) == 0 && i != -1) // location of event
@@ -108,7 +103,7 @@ Calendar* ics_load(char* file)
             {
                 die("Corrupt ics file (invalid LOCATION somewhere)");
             }
-            strcpy(cal->events[i].location, miniBuff);
+            strcpy(cal.events[i].location, miniBuff);
             free(miniBuff);
         }
         else if (strncmp(buff, "DESCRIPTION", strlen("DESCRIPTION")) == 0 && i != -1) // description of event
@@ -118,7 +113,7 @@ Calendar* ics_load(char* file)
             {
                 die("Corrupt ics file (invalid DESCRIPTION somewhere)");
             }
-            strcpy(cal->events[i].description, miniBuff);
+            strcpy(cal.events[i].description, miniBuff);
             free(miniBuff);
         }
         else if (strncmp(buff, "PRIORITY", strlen("PRIORITY")) == 0 && i != -1) // priority of event
@@ -133,7 +128,7 @@ Calendar* ics_load(char* file)
             {
                 die("Corrupt ics file (invalid PRIORITY somewhere (unable to interpret))");
             }
-            cal->events[i].priority = priority;
+            cal.events[i].priority = priority;
             free(miniBuff);
         }
      
@@ -202,24 +197,24 @@ int ics_write(Calendar* cal, char* file)
     return 1;
 }
 
-Calendar* entry_add(Calendar* cal, const Event e)
+int entry_add(Calendar* cal, const Event e) // TODO update fnctn info
 {
     /* First, make sure Calendar pointer wasn't NULL */
     if (cal == NULL)
     {
-       return NULL; // caller should check for this
+       return 0; // caller should check for this
     }
 
-    /* Reallocate memory for cal, adding 'space' for another entry */
-    Calendar* tmp = realloc( cal, (sizeof(*cal) + sizeof(Event)) );
+    /* Reallocate memory for events in cal, adding more space for another entry */
+    Event* tmp = realloc( cal->events, (sizeof(*(cal->events)) + sizeof(Event)) );
     // only reassign pointer to cal if reallocating has been successful (so as to prevent losing pointer upon unsuccessful reallocation)
     if (tmp != NULL)
     {
-        cal = tmp;
+        cal->events = tmp;
     }
     else
     {
-        return NULL; // caller should check for this
+        return 0; // caller should check for this
     }
 
     /* Writing input event details into newly allocated extra space */
@@ -235,5 +230,5 @@ Calendar* entry_add(Calendar* cal, const Event e)
     /* Increase number of entries value in structure and return pointer */
     ++cal->numberOfEntries;
     
-    return cal;
+    return 1;
 }
