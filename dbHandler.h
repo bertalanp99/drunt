@@ -4,10 +4,10 @@
 #include "structs.h"
 #include "enums.h"
 
-void ics_load(char*, Calendar*);
+MYERRNO ics_load(const char*, Calendar*);
 
-MYERRNO ics_write(Calendar*, char*);
+MYERRNO ics_write(const Calendar*, char*);
 
-MYERRNO entry_add(Calendar*, const Event);
+MYERRNO VEvent_add(Calendar*, const VEvent);
 
 #endif

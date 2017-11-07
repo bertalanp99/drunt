@@ -23,16 +23,11 @@ typedef struct {
 typedef struct {
     DateTime start;
     DateTime end;
-    char* name;
+    char* summary;
     char* location;
     char* description;
     int priority;
-} Event;
-
-//typedef struct EventNode_s {
-//    Event data;
-//    struct EventNode_s next;
-//} EventNode;
+} VEvent;
 
 typedef struct {
     char longName[10];
@@ -42,7 +37,7 @@ typedef struct {
 /* Databases */
 typedef struct {
     int numberOfEntries;
-    Event* events;
+    VEvent* vevents;
 } Calendar;
 
 #endif

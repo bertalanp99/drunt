@@ -5,6 +5,6 @@
 
 void printRawCalendar(Calendar);
 
-void printRawEvent(Event);
+void printRawVEvent(VEvent);
 
 #endif

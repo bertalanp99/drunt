@@ -10,9 +10,10 @@ int main(int argc, char *argv[])
 {
     if (strcmp(argv[1], "--list") == 0 || strcmp(argv[1], "-l") == 0)
     {
-        Calendar mycalendar = ics_load("cal.ics");
+        Calendar mycalendar = { .numberOfEntries = 0, .vevents = NULL };
+        ics_load("cal.ics", &mycalendar);
         printRawCalendar(mycalendar);
-        free(mycalendar.events);
+        free(mycalendar.vevents); // TODO calendar destroyer
    }
     else if (strcmp(argv[1], "--add") == 0 || strcmp(argv[1], "-a") == 0)
     {
@@ -20,8 +21,9 @@ int main(int argc, char *argv[])
     }
     else if (strcmp(argv[1], "-temp") == 0)
     {
-        Calendar mycalendar = ics_load("cal.ics");
-        Event myevent = {
+        Calendar mycalendar = { .numberOfEntries = 0, .vevents = NULL };
+        ics_load("cal.ics", &mycalendar);
+        VEvent myvevent = {
             .start ={   .date = {   .year = 2017,
                                     .month = 12,
                                     .day = 15
@@ -38,13 +40,13 @@ int main(int argc, char *argv[])
                                     .minute = 0
                                 }
                     },
-            .name = "Tüntetés a kacsák egyenjogúsága ellen",
+            .summary = "Tüntetés a kacsák egyenjogúsága ellen",
             .location= "New York",
             .description = "Sálálálá",
             .priority = 10
         };
         
-        if (entry_add(&mycalendar, myevent) == 0)
+        if (VEvent_add(&mycalendar, myvevent) == 0)
         {
             die("Fuck! Event adder did not work");
         }
@@ -54,17 +56,18 @@ int main(int argc, char *argv[])
             die("File already exists");
         }
 
-        free(mycalendar.events);
+        free(mycalendar.vevents); // ahem...
     }
     else if (strcmp(argv[1], "-temp2") == 0) // load & write
     {
-        Calendar mycalendar = ics_load("cal.ics");
+        Calendar mycalendar = { .numberOfEntries = 0, .vevents = NULL };
+        ics_load("cal.ics", &mycalendar);
         if (ics_write(&mycalendar, "newCal.ics") == 0)
         {
             die("File already exists");
         }
 
-        free(mycalendar.events);
+        free(mycalendar.vevents);
     }
 
     return 0;

@@ -14,7 +14,7 @@
 #define YEAR_MIN 1950
 #define YEAR_MAX 2050
 
-#define BUFFSIZE 256
+#define BUFFSIZE 1024
 
 int isLeapYear(const int year)
 {
@@ -32,11 +32,51 @@ int hasICSTag(const char* str, const char* tag)
     return !strncmp(str, tag, strlen(tag));
 }
 
-MYERRNO icsTimeStampReader(const char* str, DateTime* dt)
+MYERRNO ICSVEventCounter(FILE* fp, int* count)
+{
+    assert(fp != NULL && count != NULL);
+
+    char buff[BUFFSIZE];
+    
+    *count = 0;
+    int currentLine = 0;
+    int noend = 0;
+
+    /* Read first line and check whether file is empty */
+    ++currentLine;
+    if (fgets(buff, BUFFSIZE, fp) == NULL)
+    {
+        return FAIL_FILE_EMPTY;
+    }
+
+    /* Read other lines and count occurrences of VEVENTs */
+    while(!hasICSTag(buff, "END:VCALENDAR"))
+    {
+        ++ currentLine;
+
+        if (hasICSTag(buff, "BEGIN:VEVENT"))
+        {
+            ++*count;
+        }
+
+        // prevent infinite loop by also checking for EOF
+        if (feof(fp))
+        {
+            noend = 1;
+            break;
+        }
+
+        fgets(buff, BUFFSIZE, fp);
+    }
+
+    return (noend) ? SUCCESS : FAIL_ICS_NOEND;
+}
+
+MYERRNO ICSTimeStampReader(const char* str, DateTime* dt)
 {
     /* Format of iCalendar timestamp: YYYYMMDDTHHMMSS --- ex gr 20171112T090000 = 2017/11/12 09.00.00 (we are not going to use seconds for anything) */
 
-    assert(str != NULL && dt != NULL);
+    assert( str != NULL && dt != NULL && !strcmp(str, "") );
 
     int year;
     int month;
@@ -47,78 +87,50 @@ MYERRNO icsTimeStampReader(const char* str, DateTime* dt)
     
     /* Interpret the input string and check for errors each time (myatoi()'s return comes in handy) */
     char buff[4]; // the longest string part is the year, which is 4 characters long
-    
-    // TODO better way to copy certain parts of string into buffer?
-    int i = 0;
-    int j = 0;
-    
+
     // year
-    for (i = 0; i < 4; ++i)
-    {
-        buff[j++] = str[i];
-    }
-    buff[j] = '\0';
+    strncpy(buff, str, 4);
     if (myatoi(buff, &year) == 0)
     {
-        return 0;
+        return FAIL_MYATOI;
     }
 
     // month
-    j = 0;
-    for (i = 4; i < 6; ++i)
-    {
-        buff[j++] = str[i];
-    }
-    buff[j] = '\0';
+    strncpy(buff, (str + 4), 2);
     if (myatoi(buff, &month) == 0)
     {
-        return 0;
+        return FAIL_MYATOI;
     }
 
     // day
-    j = 0;
-    for (i = 6; i < 8; ++i)
-    {
-        buff[j++] = str[i];
-    }
-    buff[j] = '\0';
+    strncpy(buff, (str + 6), 2);
     if (myatoi(buff, &day) == 0)
     {
-        return 0;
+        return FAIL_MYATOI;
     }
 
     // hour
-    j = 0;
-    for (i = 9; i < 11; ++i)
-    {
-        buff[j++] = str[i];
-    }
-    buff[j] = '\0';
+    strncpy(buff, (str + 9), 2);
     if (myatoi(buff, &hour) == 0)
     {
-        return 0;
+        return FAIL_MYATOI;
     }
 
     // minute
-    j = 0;
-    for (i = 11; i < 13; ++i)
-    {
-        buff[j++] = str[i];
-    }
-    buff[j] = '\0';
+    strncpy(buff, (str + 11), 2);
     if (myatoi(buff, &minute) == 0)
     {
-        return 0;
+        return FAIL_MYATOI;
     }
 
-    /* Seemingly, no errors were encountered. Set values at input location as asked */
+    /* Seemingly, no errors were encountered --- set values */
     dt->date.year = year;
     dt->date.month = month;
     dt->date.day = day;
     dt->time.hour = hour;
     dt->time.minute = minute;
 
-    return 1;
+    return SUCCESS;
 }
 
 int myatoi(const char* str, int* out) // TODO CREDIT THIS FUNCTION TO "https://stackoverflow.com/a/26083517/6860707"
@@ -127,10 +139,17 @@ int myatoi(const char* str, int* out) // TODO CREDIT THIS FUNCTION TO "https://s
     char* endp = NULL; // pointer to remaining characters
     long l = 0; // strtol's output goes here
 
-    errno = 0; // reset errno
+    errno = 0;
     l = strtol(str, &endp, 10);
 
-    if (str == endp || (errno == ERANGE && l == LONG_MIN) || (errno == ERANGE && l == LONG_MAX) || errno == EINVAL || (errno != 0 && l == 0))
+    if
+        (
+        str == endp                         ||
+        (errno == ERANGE && l == LONG_MIN)  || 
+        (errno == ERANGE && l == LONG_MAX)  || 
+        errno == EINVAL                     || 
+        (errno != 0 && l == 0)
+        )
     {
         return 0; // conversion failure, caller should know
     }
@@ -145,10 +164,8 @@ void icsTagRemover(char* original, char* new)
 {
     assert
         (   
-            original != NULL        &&
-            new != NULL             &&
-            !strcmp(original, "")   &&
-            !strcmp(new, "")
+            original != NULL      && new != NULL        &&
+            !strcmp(original, "") && !strcmp(new, "")
         );
 
     /* Look for iCalendar tag in input string */
@@ -166,6 +183,8 @@ void icsTagRemover(char* original, char* new)
     
 int promptYN(char* message, ...)
 {
+    assert(message != NULL);
+
     /* Handle parameters */
     char buff[BUFFSIZE];
     va_list args;
