@@ -1,8 +1,6 @@
 #ifndef STRUCTS_H__
 #define STRUCTS_H__
 
-#define MAX_LINELENGTH 256
-
 /* Date & Time */
 
 typedef struct {
@@ -25,16 +23,16 @@ typedef struct {
 typedef struct {
     DateTime start;
     DateTime end;
-    char name[MAX_LINELENGTH];
-    char location[MAX_LINELENGTH];
-    char description[MAX_LINELENGTH];
+    char* name;
+    char* location;
+    char* description;
     int priority;
 } Event;
 
-typedef struct EventNode_s {
-    Event data;
-    struct EventNode_s next;
-} EventNode;
+//typedef struct EventNode_s {
+//    Event data;
+//    struct EventNode_s next;
+//} EventNode;
 
 typedef struct {
     char longName[10];
@@ -44,7 +42,7 @@ typedef struct {
 /* Databases */
 typedef struct {
     int numberOfEntries;
-    EventNode EventNodeHead;
+    Event* events;
 } Calendar;
 
 #endif

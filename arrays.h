@@ -1,6 +1,7 @@
 #ifndef ARRAYS_H__
 #define ARRAYS_H__
 
+#include <stdlib.h>
 
 int monthLength[12] = {
     31, // January
@@ -31,5 +32,15 @@ MonthName MonthNames[12] = {
     { "November"    ,   "Nov" },
     { "December"    ,   "Dec" }
 }; // TODO do I need this?
+
+const char* ICSTags[] = {
+    "DTSTART:",
+    "DTEND:",
+    "SUMMARY:",
+    "LOCATION:",
+    "DESCRIPTION:",
+    "PRIORITY:",
+    NULL
+};
 
 #endif

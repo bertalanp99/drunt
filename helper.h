@@ -5,11 +5,13 @@
 
 int isLeapYear(const int);
 
+int hasICSTag(const char*, const char*);
+
 int icsTimeStampReader(const char*, DateTime*);
 
 int myatoi(const char*, int*);
 
-char* icsTagRemover(char*, char*);
+void icsTagRemover(char*, char*);
 
 int promptYN(char*, ...);
 

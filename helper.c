@@ -1,5 +1,7 @@
 #include "helper.h"
 #include "errorHandler.h"
+#include "arrays.h"
+#include "enums.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,6 +9,7 @@
 #include <limits.h>
 #include <string.h>
 #include <stdarg.h>
+#include <assert.h>
 
 #define YEAR_MIN 1950
 #define YEAR_MAX 2050
@@ -23,15 +26,17 @@ int isLeapYear(const int year)
     return ( (year % 4 == 0) && (year % 100 != 0) && (year % 400 == 0) );
 }
 
-int icsTimeStampReader(const char* str, DateTime* dt)
+int hasICSTag(const char* str, const char* tag)
+{
+    assert(str != NULL && tag != NULL);
+    return !strncmp(str, tag, strlen(tag));
+}
+
+MYERRNO icsTimeStampReader(const char* str, DateTime* dt)
 {
     /* Format of iCalendar timestamp: YYYYMMDDTHHMMSS --- ex gr 20171112T090000 = 2017/11/12 09.00.00 (we are not going to use seconds for anything) */
 
-    /* First, check for erroneous input */
-    if (str == NULL)
-    {
-        return 0;
-    }
+    assert(str != NULL && dt != NULL);
 
     int year;
     int month;
@@ -106,7 +111,7 @@ int icsTimeStampReader(const char* str, DateTime* dt)
         return 0;
     }
 
-    /* Seemingly, no errors were encountered. Let's set values at input location as asked */
+    /* Seemingly, no errors were encountered. Set values at input location as asked */
     dt->date.year = year;
     dt->date.month = month;
     dt->date.day = day;
@@ -136,22 +141,27 @@ int myatoi(const char* str, int* out) // TODO CREDIT THIS FUNCTION TO "https://s
     return 1;
 }
 
-char* icsTagRemover(char* line, char* tag)
+void icsTagRemover(char* original, char* new)
 {
-    /* First, check for erroneous arguments */
-    if (line == NULL || tag == NULL || (strcmp(line, "") == 0) || (strcmp(tag, "") == 0))
+    assert
+        (   
+            original != NULL        &&
+            new != NULL             &&
+            !strcmp(original, "")   &&
+            !strcmp(new, "")
+        );
+
+    /* Look for iCalendar tag in input string */
+    for (int i = 0; ICSTags[i] != NULL; ++i)
     {
-        return NULL;
+        if ( !strncmp(original, ICSTags[i], strlen(ICSTags[i])) )
+        {
+            new = (original + strlen(ICSTags[i])); // found tag --> store it in new and return
+            return;
+        }
     }
     
-    char* out = malloc( (strlen(line) - strlen(tag) - 2 + 1) * sizeof(char) ); // -2: colon between tag and value and \n at end; +1: closing 0
-    int i = 0; // itetator for out
-    for (int j = strlen(tag) + 1; line[j] != '\n'; ++j) 
-    {
-        out[i++] = line[j];
-    }
-    out[i] = '\0';
-    return out;
+    new = NULL; // could not find tag, return NULL to indicate
 }
     
 int promptYN(char* message, ...)

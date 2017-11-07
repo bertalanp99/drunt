@@ -11,31 +11,35 @@
 #define MAX_LINELENGTH 256 // ics allows 75 octets
 #define ICALVERSION "2.0"
 
-Calendar ics_load(char* file)
+MYERRNO ics_load(char* file, Calendar* cal) // loads ICS into memory
 {
     FILE* fp;
     fp = fopen(file, "r");
     if (fp == NULL)
     {
-        die("Unable to open file for reading: %s", file);
+        return FAIL_FILE_READ;
     }
 
     char buff[MAX_LINELENGTH];
 
     /* First, count how many events there are */
     int count = 0;
+    int currentLine = 0;
 
     // check whether file is empty
+    ++currentLine;
     if (fgets(buff, MAX_LINELENGTH, fp) == NULL)
     {
-        die("ics file (%s) is empty", file);
+        return FAIL_FILE_EMPTY;
     }
 
     // TODO implement other sorts of iCalendar entries (e.g. VTODO)
     // keep reading lines until END:VCALENDAR is encountered
-    while (strncmp(buff, "END:VCALENDAR", strlen("END:VCALENDAR")) != 0)
+    while (!hasICSTag(buff, "END:VCALENDAR"))
     {
-        if (strncmp(buff, "BEGIN:VEVENT", strlen("BEGIN:VEVENT")) == 0)
+        ++currentLine;
+
+        if (hasICSTag(buff, "BEGIN:VEVENT"))
         {
             ++count;
         }
@@ -43,7 +47,7 @@ Calendar ics_load(char* file)
         // prevent infinite loop by also checking for EOF
         if (feof(fp))
         {
-            warning("%s contains no %s! Last line read was\n\t%s", file, "END:VCALENDAR", buff);
+            warning("%s contains no %s! Last line read was %s:%d:\n\t%s", file, "END:VCALENDAR", file, currentLine, buff);
             break;
         }
         
@@ -57,92 +61,98 @@ Calendar ics_load(char* file)
     fp = fopen(file, "r");
     if (fp == NULL)
     {
-        die("Unable to open file for reading: %s", file);
+        return FAIL_FILE_READ;
     }
 
     /* Then create and fill database with ics contents */
     Event* tmp = malloc( count * sizeof(Event) );
     if (tmp == NULL)
     {
-        die("Failed to allocate memory for database");
+        return FAIL_MALLOC;
     }
     
-    // initialise calendar
-    Calendar cal = {.numberOfEntries = count, .events = tmp};
+    // set values of Calendar cal
+    cal->numberOfEntries = count;
+    cal->events = tmp;
 
     int i = -1; // index of current event; initialised to -1 because first event shall be at index 0
-    int currentLine = 0; // store number of currently read line so that it can be referenced in case of errors
+    currentLine = 0;
 
     ++currentLine;
     fgets(buff, MAX_LINELENGTH, fp); // no need to check for empty file, already done
-    while (strncmp(buff, "END:VCALENDAR", strlen("END:VCALENDAR")) != 0)
+    while (!hasICSTag(buff, "END:VCALENDAR"))
     {
-        if (strncmp(buff, "BEGIN:VEVENT", strlen("BEGIN:VEVENT")) == 0)
+        if (hasICSTag(buff, "BEGIN:VEVENT"))
         {
             ++i;
         }
-        else if (strncmp(buff, "DTSTART", strlen("DTSTART")) == 0 && i != -1) // 'from' date (+time)
+        
+        if (i != -1) // prevent processing lines outside :VEVENT tags
         {
-            char* miniBuff = icsTagRemover(buff, "DTSTART");
-            if (icsTimeStampReader(miniBuff, &cal.events[i].start) == 0)
+            if (hasICSTag(buff, "DTSTART"))
             {
-                die("Corrupt ics file (invalid %s at %s:%d)", "DTSTART", file, currentLine);
+                char* miniBuff = icsTagRemover(buff, "DTSTART");
+                if (icsTimeStampReader(miniBuff, &cal.events[i].start) == 0)
+                {
+                    warning("Corrupt ics file (invalid %s at %s:%d)", "DTSTART", file, currentLine);
+                    return FAIL_FILE_CORRUPT;
+                }
+                free(miniBuff);
             }
-            free(miniBuff);
-        }
-        else if (strncmp(buff, "DTEND", strlen("DTEND")) == 0 && i != -1)  // 'to' date (+time)
-        {
-            char* miniBuff = icsTagRemover(buff, "DTEND");
-            if (icsTimeStampReader(miniBuff, &cal.events[i].end) == 0)
+            else if (hasICSTag(buff, "DTEND"))
             {
-                die("Corrupt ics file (invalid %s at %s:%d)", "DTEND", file, currentLine);
+                char* miniBuff = icsTagRemover(buff, "DTEND");
+                if (icsTimeStampReader(miniBuff, &cal.events[i].end) == 0)
+                {
+                    die("Corrupt ics file (invalid %s at %s:%d)", "DTEND", file, currentLine);
+                }
+                free(miniBuff);
             }
-            free(miniBuff);
-        }
-        else if (strncmp(buff, "SUMMARY", strlen("SUMMARY")) == 0 && i != -1) // 'name' of event
-        {
-            char* miniBuff = icsTagRemover(buff, "SUMMARY");
-            if (miniBuff == NULL)
+            else if (hasICSTag(buff, "SUMMARY"))
             {
-                die("Corrupt ics file (invalid %s at %s:%d)", "SUMMARY", file, currentLine);
+                char* miniBuff = icsTagRemover(buff, "SUMMARY");
+                if (miniBuff == NULL)
+                {
+                    die("Corrupt ics file (invalid %s at %s:%d)", "SUMMARY", file, currentLine);
+                }
+                strcpy(cal.events[i].name, miniBuff);
+                free(miniBuff);
             }
-            strcpy(cal.events[i].name, miniBuff);
-            free(miniBuff);
-        }
-        else if (strncmp(buff, "LOCATION", strlen("LOCATION")) == 0 && i != -1) // location of event
-        {
-            char* miniBuff = icsTagRemover(buff, "LOCATION");
-            if (miniBuff == NULL)
+            else if (strncmp(buff, "LOCATION", strlen("LOCATION")) == 0 && i != -1)
             {
-                die("Corrupt ics file (invalid %s at %s:%d)", "LOCATION", file, currentLine);
+                char* miniBuff = icsTagRemover(buff, "LOCATION");
+                if (miniBuff == NULL)
+                {
+                    die("Corrupt ics file (invalid %s at %s:%d)", "LOCATION", file, currentLine);
+                }
+                strcpy(cal.events[i].location, miniBuff);
+                free(miniBuff);
             }
-            strcpy(cal.events[i].location, miniBuff);
-            free(miniBuff);
-        }
-        else if (strncmp(buff, "DESCRIPTION", strlen("DESCRIPTION")) == 0 && i != -1) // description of event
-        {
-            char* miniBuff = icsTagRemover(buff, "DESCRIPTION");
-            if (miniBuff == NULL)
+            else if (strncmp(buff, "DESCRIPTION", strlen("DESCRIPTION")) == 0 && i != -1)
             {
-                die("Corrupt ics file (invalid %s at %s:%d)", "DESCRIPTION", file, currentLine);
+                char* miniBuff = icsTagRemover(buff, "DESCRIPTION");
+                if (miniBuff == NULL)
+                {
+                    die("Corrupt ics file (invalid %s at %s:%d)", "DESCRIPTION", file, currentLine);
+                }
+                strcpy(cal.events[i].description, miniBuff);
+                free(miniBuff);
             }
-            strcpy(cal.events[i].description, miniBuff);
-            free(miniBuff);
-        }
-        else if (strncmp(buff, "PRIORITY", strlen("PRIORITY")) == 0 && i != -1) // priority of event
-        {
-            char* miniBuff = icsTagRemover(buff, "PRIORITY");
-            if (miniBuff == NULL)
+            else if (strncmp(buff, "PRIORITY", strlen("PRIORITY")) == 0 && i != -1)
             {
-                die("Corrupt ics file (invalid %s at %s:%d)", "PRIORITY", file, currentLine);
+                char* miniBuff = icsTagRemover(buff, "PRIORITY");
+                if (miniBuff == NULL)
+                {
+                    die("Corrupt ics file (invalid %s at %s:%d)", "PRIORITY", file, currentLine);
+                }
+                int priority;
+                if (myatoi(miniBuff, &priority) == 0)
+                {
+                    die("Corrupt ics file (invalid %s at %s:%d)", "PRIORITY", file, currentLine);
+                }
+                cal.events[i].priority = priority;
+                free(miniBuff);
             }
-            int priority;
-            if (myatoi(miniBuff, &priority) == 0)
-            {
-                die("Corrupt ics file (invalid %s at %s:%d)", "PRIORITY", file, currentLine);
-            }
-            cal.events[i].priority = priority;
-            free(miniBuff);
         }
         
         // prevent infinite loop by also checking for EOF

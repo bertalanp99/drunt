@@ -4,7 +4,7 @@
 #include "structs.h"
 #include "enums.h"
 
-Calendar ics_load(char*);
+void ics_load(char*, Calendar*);
 
 MYERRNO ics_write(Calendar*, char*);
 

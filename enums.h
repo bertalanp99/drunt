@@ -40,14 +40,17 @@ typedef enum {
     Long
 } Format;
 
-/* Function ERRNOs */
+/* Misc */
 
 typedef enum {
     FAIL_PROMPT,
     FAIL_REMOVE,
-    FAIL_FOPEN,
-    FAIL_NULLPASSED,
+    FAIL_FILE_READ,
+    FAIL_FILE_EMPTY,
+    FAIL_FILE_CORRUPT,
+    FAIL_MALLOC,
     FAIL_REALLOC,
+    FAIL_MYATOI,
     SUCCESS
 } MYERRNO;
 
