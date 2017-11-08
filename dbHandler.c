@@ -357,6 +357,19 @@ MYERRNO VEvent_add(Calendar* cal, const VEvent ve)
 //    return SUCCESS;
 //}
 
+MYERRNO Calendar_traverse(Calendar* cal)
+{
+    assert(cal != NULL);
+
+    VEventNode* traveller = cal->first->next;
+    while (traveller != cal->last)
+    {
+        traveller = traveller->next;
+    }
+
+    return SUCCESS;
+}
+
 MYERRNO Calendar_create(Calendar* cal)
 {
     assert(cal != NULL);
@@ -364,11 +377,17 @@ MYERRNO Calendar_create(Calendar* cal)
     cal->numberOfEntries = 0;
     
     VEventNode* tmpven = malloc( sizeof(VEventNode) );
-    // TODO check for NULL
+    if (tmpven == NULL)
+    {
+        return FAIL_MALLOC;
+    }
     cal->first = tmpven;
     
     VEventNode* tmpven = malloc( sizeof(VEventNode) );
-    // TODO check for NULL
+    if (tmpven == NULL)
+    {
+        return FAIL_MALLOC;
+    }
     cal->last = tmpven;
 
     cal->first->prev = NULL;
@@ -379,6 +398,3 @@ MYERRNO Calendar_create(Calendar* cal)
 
     return SUCCESS;
 }
-
-MYERRNO Calendar_prependVEvent(Calendar* cal, VEvent ve)
-
