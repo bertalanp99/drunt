@@ -104,6 +104,10 @@ MYERRNO ICSTimeStampReader(const char* str, DateTime* dt)
     {
         return FAIL_MYATOI;
     }
+    if (!isValidYear(year))
+    {
+        return FAIL_VALUE_INVALID_YEAR;
+    }
 
     // month
     strncpy(buff, (str + 4), 2);
@@ -112,12 +116,20 @@ MYERRNO ICSTimeStampReader(const char* str, DateTime* dt)
     {
         return FAIL_MYATOI;
     }
+    if (!isValidMonth(month))
+    {
+        return FAIL_VALUE_INVALID_MONTH;
+    }
 
     // day
     strncpy(buff, (str + 6), 2);
     if (myatoi(buff, &day) == 0)
     {
         return FAIL_MYATOI;
+    }
+    if (!isValidDay(day))
+    {
+        return FAIL_VALUE_INVALID_DAY;
     }
 
     // hour
@@ -126,6 +138,10 @@ MYERRNO ICSTimeStampReader(const char* str, DateTime* dt)
     {
         return FAIL_MYATOI;
     }
+    if (!isValidHour(hour))
+    {
+        return FAIL_VALUE_INVALID_HOUR;
+    }
 
     // minute
     strncpy(buff, (str + 11), 2);
@@ -133,7 +149,11 @@ MYERRNO ICSTimeStampReader(const char* str, DateTime* dt)
     {
         return FAIL_MYATOI;
     }
-
+    if (!isValidMinute(minute))
+    {
+        return FAIL_VALUE_INVALID_MINUTE;
+    }
+    
     /* Seemingly, no errors were encountered --- set values */
     dt->date.year = year;
     dt->date.month = month;
@@ -143,6 +163,36 @@ MYERRNO ICSTimeStampReader(const char* str, DateTime* dt)
 
     return SUCCESS;
 }
+
+int isValidYear(const int year)
+{
+    return (year >= 1950 && year <= 2050);
+}
+
+int isValidMonth(const int month)
+{
+    return (month >= 1 && month <= 12);
+}
+
+int isValidDay(const int day)
+{
+    return (day >=1 && day <= 31);
+}
+
+int isValidHour(const int hour)
+{
+    return (hour >= 0 && hour < 24);
+}
+
+int isValidMinute(const int minute)
+{
+    return (minute >= 0 && minute < 60);
+}
+
+/*int isValidDate(const Date d)
+{
+    // TODO create
+}*/
 
 void removeNewLineChar( char* str )
 {

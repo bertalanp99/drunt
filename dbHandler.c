@@ -14,7 +14,7 @@
 #define ICALVERSION "2.0"
 
 MYERRNO ics_load(const char* file, Calendar* cal) // loads ICS into RAM
-{
+{ // TODO handle nonexisting tags
     assert(file != NULL && cal != NULL);
 
     /* Count VEVENTs in file */
@@ -63,24 +63,30 @@ MYERRNO ics_load(const char* file, Calendar* cal) // loads ICS into RAM
     char buff[BUFFSIZE];
     int i = -1; // index of current event; initialised to -1 because first event shall be at index 0
     int currentLine = 0;
+    int hasSTARTVCAL = 0;
 
     ++currentLine;
     fgets(buff, BUFFSIZE, fp);
 
     while (!hasICSTag(buff, "END:VCALENDAR"))
     {
+        if (hasICSTag(buff, "BEGIN:VCALENDAR"))
+        {
+            hasSTARTVCAL = 1;
+        }
+        
         if (hasICSTag(buff, "BEGIN:VEVENT"))
         {
             ++i;
         }
         
-        if (i != -1) // prevent processing lines outside BEGIN/END:VEVENT tags
+        if (i != -1) // prevent processing lines outside BEGIN/END:VEVENT tags or even outside BEGIN/END:VCALENDAR tags
         {
             if (hasICSTag(buff, "DTSTART"))
             {
                 if (ICSTimeStampReader(buff + strlen("DTSTART:"), &cal->vevents[i].start) != SUCCESS)
                 {
-                    warning("Corrupt iCalendar file (invalid DTSTART at %s:%d)", file, currentLine);
+                    warning("Corrupt iCalendar file (invalid DTSTART at %s:%d:\n\t%s)", file, currentLine, buff);
                     return FAIL_FILE_CORRUPT;
                 }
             }
@@ -88,7 +94,7 @@ MYERRNO ics_load(const char* file, Calendar* cal) // loads ICS into RAM
             {
                 if (ICSTimeStampReader(buff + strlen("DTEND:"), &cal->vevents[i].end) != SUCCESS)
                 {
-                    warning("Corrupt iCalendar file (invalid DTEND at %s:%d)", file, currentLine);
+                    warning("Corrupt iCalendar file (invalid DTEND at %s:%d:\n\t%s)", file, currentLine, buff);
                     return FAIL_FILE_CORRUPT;
                 }
             }
@@ -168,6 +174,13 @@ MYERRNO ics_load(const char* file, Calendar* cal) // loads ICS into RAM
         // advance
         ++currentLine;
         fgets(buff, BUFFSIZE, fp);
+    }
+
+    if (!hasSTARTVCAL)
+    {
+        warning("%s contains no START:VCALENDAR! Ignored the rest of file", file);
+        fclose(fp);
+        return FAIL_FILE_CORRUPT;
     }
 
     fclose(fp);
