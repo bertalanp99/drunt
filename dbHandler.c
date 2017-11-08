@@ -48,17 +48,8 @@ MYERRNO ics_load(const char* file, Calendar* cal) // loads ICS into RAM
         warning("Failed to open iCaelndar file %s for reading", file);
         return FAIL_FILE_READ;
     } // NOTE: no need to check for empty file as event counter has already done that
-
-    // allocate memory for Calendar
-    VEvent* tmp = malloc( count * sizeof(VEvent) );
-    if (tmp == NULL)
-    {
-        warning("Failed to allocate memory for events");
-        return FAIL_MALLOC;
-    }
     
-    cal->numberOfEntries = count;
-    cal->vevents = tmp;
+    Calendar cal; // TODO Calendar_create
 
     char buff[BUFFSIZE];
     int i = -1; // index of current event; initialised to -1 because first event shall be at index 0
@@ -314,3 +305,80 @@ MYERRNO VEvent_add(Calendar* cal, const VEvent ve)
     
     return SUCCESS;
 }
+
+//MYERRNO Calendar_create(Calendar* cal, VEvent ve)
+//{
+//    assert(cal != NULL); // TODO isValidEvent()
+//
+//    /* First, allocate memory for a new Calendar */
+//    Calendar* tmpc = malloc( sizeof(Calendar) );
+//    if (tmpc == NULL)
+//    {
+//        warning("Failed to allocate memory for new calendar!");
+//        return FAIL_MALLOC;
+//    }
+//    cal = tmpc;
+//    
+//    /* Next, allocate memory for 'first' sentinel */
+//    VEventNode* tmpven = malloc( sizeof(VEventNode) );
+//    if (tmpven == NULL)
+//    {
+//        warning("Failed to allocate memory for new VEvent node!");
+//        return FAIL_MALLOC;
+//    }
+//    cal->first = tmpven;
+//    cal->first->prev = NULL; // sentinel marks first element
+//    
+//    /* Allocate memory for the actual VEvent and assign 'first' sentinel */
+//    tmpven = malloc( sizeof(VEventNode) );
+//    if (tmpven == NULL)
+//    {
+//        warning("Failed to allocate memory for new VEvent node!");
+//        return FAIL_MALLOC;
+//    }
+//    cal->first->next = tmpven;
+//
+//    /* Fill in data in new VEvent node */
+//    cal->first->next->ve = ve;
+//
+//    /* Allocate memory for 'last' sentinel */
+//    tmpven = malloc( sizeof(VEventNode) );
+//    if (tmpven == NULL)
+//    {
+//        warning("Failed to allocate memory for new VEvent node!");
+//        return FAIL_MALLOC;
+//    }
+//    cal->last = tmpven;
+//    cal->last->next = NULL;
+//
+//    /* Finally, connect new VEvent node and 'last' sentinel */
+//    cal->first->next->next = cal->last;
+//
+//    return SUCCESS;
+//}
+
+MYERRNO Calendar_create(Calendar* cal)
+{
+    assert(cal != NULL);
+
+    cal->numberOfEntries = 0;
+    
+    VEventNode* tmpven = malloc( sizeof(VEventNode) );
+    // TODO check for NULL
+    cal->first = tmpven;
+    
+    VEventNode* tmpven = malloc( sizeof(VEventNode) );
+    // TODO check for NULL
+    cal->last = tmpven;
+
+    cal->first->prev = NULL;
+    cal->first->next = cal->last;
+    
+    cal->last->prev = cal->first;
+    cal->last->next = NULL;
+
+    return SUCCESS;
+}
+
+MYERRNO Calendar_prependVEvent(Calendar* cal, VEvent ve)
+

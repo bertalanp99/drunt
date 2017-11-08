@@ -35,9 +35,16 @@ typedef struct {
 } MonthName; // TODO do I really need this?
 
 /* Databases */
+typedef struct VEventNode_s {
+    VEvent ve;
+    struct VEventNode_s* prev;
+    struct VEventNode_s* next;
+} VEventNode;
+
 typedef struct {
     int numberOfEntries;
-    VEvent* vevents;
+    VEventNode* first;
+    VEventNode* last;
 } Calendar;
 
 #endif

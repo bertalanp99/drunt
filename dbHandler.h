@@ -10,4 +10,8 @@ MYERRNO ics_write(const Calendar*, char*);
 
 MYERRNO VEvent_add(Calendar*, const VEvent);
 
+MYERRNO Calendar_create(Calendar*);
+
+MYERRNO Calendar_prependVEvent(Calendar*, VEvent);
+
 #endif
