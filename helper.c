@@ -32,15 +32,23 @@ int hasICSTag(const char* str, const char* tag)
     return !strncmp(str, tag, strlen(tag));
 }
 
-MYERRNO ICSVEventCounter(FILE* fp, int* count)
+MYERRNO ICSVEventCounter(const char* file, int* count)
 {
-    assert(fp != NULL && count != NULL);
-
+    assert (file != NULL && count != NULL);
+    
+    /* Attempt to open file */
+    FILE* fp;
+    fp = fopen(file, "r");
+    if (fp == NULL)
+    {
+        return FAIL_FILE_READ;
+    }
+    
+    /* Create buffer to read lines into */
     char buff[BUFFSIZE];
     
     *count = 0;
     int currentLine = 0;
-    int noend = 0;
 
     /* Read first line and check whether file is empty */
     ++currentLine;
@@ -62,21 +70,23 @@ MYERRNO ICSVEventCounter(FILE* fp, int* count)
         // prevent infinite loop by also checking for EOF
         if (feof(fp))
         {
-            noend = 1;
-            break;
+            warning("iCalendar file %s contains no END:VCALENDAR! Last line read was %s:%d:\n\t%s", file, file, currentLine, buff);
+            return FAIL_ICS_NOEND;
         }
 
         fgets(buff, BUFFSIZE, fp);
     }
 
-    return (noend) ? SUCCESS : FAIL_ICS_NOEND;
+    fclose(fp);
+
+    return SUCCESS;
 }
 
 MYERRNO ICSTimeStampReader(const char* str, DateTime* dt)
 {
     /* Format of iCalendar timestamp: YYYYMMDDTHHMMSS --- ex gr 20171112T090000 = 2017/11/12 09.00.00 (we are not going to use seconds for anything) */
 
-    assert( str != NULL && dt != NULL && !strcmp(str, "") );
+    assert( str != NULL && dt != NULL && strcmp(str, "") );
 
     int year;
     int month;
@@ -97,6 +107,7 @@ MYERRNO ICSTimeStampReader(const char* str, DateTime* dt)
 
     // month
     strncpy(buff, (str + 4), 2);
+    buff[2] = '\0'; // stupid strncpy() does not do this
     if (myatoi(buff, &month) == 0)
     {
         return FAIL_MYATOI;
@@ -131,6 +142,13 @@ MYERRNO ICSTimeStampReader(const char* str, DateTime* dt)
     dt->time.minute = minute;
 
     return SUCCESS;
+}
+
+void removeNewLineChar( char* str )
+{
+    assert(str != NULL && str[strlen(str) - 1] == '\n');
+
+    str[strlen(str) - 1] = '\0';
 }
 
 int myatoi(const char* str, int* out) // TODO CREDIT THIS FUNCTION TO "https://stackoverflow.com/a/26083517/6860707"

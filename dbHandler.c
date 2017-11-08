@@ -13,32 +13,27 @@
 #define MAX_LINELENGTH 600 // = 75 octets --> iCalendar allows that much
 #define ICALVERSION "2.0"
 
-MYERRNO ics_load(const char* file, Calendar* cal) // loads ICS into memory
+MYERRNO ics_load(const char* file, Calendar* cal) // loads ICS into RAM
 {
     assert(file != NULL && cal != NULL);
-    
-    /* Attempt to open file */
-    FILE* fp;
-    fp = fopen(file, "r");
-    if (fp == NULL)
-    {
-        return FAIL_FILE_READ;
-    }
 
     /* Count VEVENTs in file */
     int count = 0;
-    switch(ICSVEventCounter(fp, &count))
+    switch (ICSVEventCounter(file, &count))
     {
-        case FAIL_FILE_EMPTY:
-            warning("iCalendar file %s was empty, unable to handle", file);
+        case FAIL_FILE_READ:
+            warning("Failed to open iCalendar file %s for reading", file);
             return FAIL_FILE_EMPTY;
 
+        case FAIL_FILE_EMPTY:
+            warning("iCalendar file %s is empty --> ignoring", file);
+        
         case FAIL_ICS_NOEND:
             warning("iCalendar file %s has no END:VCALENDAR! This should be fixed ASAP");
             break;
 
         case SUCCESS:
-            break;
+            break; // everything's in order, keep going
 
         default:
             warning("Something weird happened in ics_load function, please notify dev");
@@ -46,7 +41,13 @@ MYERRNO ics_load(const char* file, Calendar* cal) // loads ICS into memory
     }
 
     /* Then create and fill database with ics contents */
-    rewind(fp);
+    FILE* fp;
+    fp = fopen(file, "r");
+    if (fp == NULL)
+    {
+        warning("Failed to open iCaelndar file %s for reading", file);
+        return FAIL_FILE_READ;
+    } // NOTE: no need to check for empty file as event counter has already done that
 
     // allocate memory for Calendar
     VEvent* tmp = malloc( count * sizeof(VEvent) );
@@ -107,6 +108,7 @@ MYERRNO ics_load(const char* file, Calendar* cal) // loads ICS into memory
                 
                 cal->vevents[i].summary = tmp;
                 strcpy( cal->vevents[i].summary, (buff + strlen("SUMMARY:")) );
+                removeNewLineChar( cal->vevents[i].summary );
             }
             else if (hasICSTag(buff, "LOCATION"))
             {
@@ -124,6 +126,7 @@ MYERRNO ics_load(const char* file, Calendar* cal) // loads ICS into memory
                 
                 cal->vevents[i].location = tmp;
                 strcpy( cal->vevents[i].location, (buff + strlen("LOCATION:")) );
+                removeNewLineChar( cal->vevents[i].location );
             }
             else if (hasICSTag(buff, "DESCRIPTION"))
             {
@@ -141,6 +144,7 @@ MYERRNO ics_load(const char* file, Calendar* cal) // loads ICS into memory
                 
                 cal->vevents[i].description = tmp;
                 strcpy( cal->vevents[i].description, (buff + strlen("DESCRIPTION:")) );
+                removeNewLineChar( cal->vevents[i].description );
             }
             else if (hasICSTag(buff, "PRIORITY"))
             {
