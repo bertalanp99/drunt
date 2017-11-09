@@ -10,9 +10,13 @@ int isLeapYear(const int);
 
 int hasICSTag(const char*, const char*);
 
-MYERRNO ICSTimeStampReader(const char*, DateTime*);
-
 MYERRNO ICSVEventCounter(const char*, int*);
+
+int isValidICS(const char*);
+
+MYERRNO isNonEmptyFile(const char*);
+
+MYERRNO ICSTimeStampReader(const char*, DateTime*);
 
 int isValidYear(const int);
 
@@ -24,7 +28,19 @@ int isValidHour(const int);
 
 int isValidMinute(const int);
 
-int isValidDate(const Date); // TODO
+int isValidDate(const Date);
+
+int isValidTime(const Time);
+
+int isValidDateTime(const DateTime);
+
+int isValidVEvent(const VEvent);
+
+RELATIVEDATE compareDateTime(const DateTime, const DateTime);
+
+RELATIVEDATE compareDate(const Date, const Date);
+
+RELATIVEDATE compareTime(const Time, const Time);
 
 void removeNewLineChar(char*);
 
@@ -33,5 +49,7 @@ int myatoi(const char*, int*);
 void icsTagRemover(char*, char*);
 
 int promptYN(char*, ...);
+
+int compareVEvent(const VEvent, const VEvent);
 
 #endif

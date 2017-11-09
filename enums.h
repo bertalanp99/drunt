@@ -58,8 +58,15 @@ typedef enum {
     FAIL_VALUE_INVALID_DAY,
     FAIL_VALUE_INVALID_HOUR,
     FAIL_VALUE_INVALID_MINUTE,
+    FAIL_VEVENT_NOT_FOUND,
     FAIL_UNKNOWN,
     SUCCESS
 } MYERRNO;
 
+typedef enum {
+    BEFORE,
+    SAME,
+    AFTER,
+    ERROR
+} RELATIVEDATE;
 #endif

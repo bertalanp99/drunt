@@ -13,388 +13,120 @@
 #define MAX_LINELENGTH 600 // = 75 octets --> iCalendar allows that much
 #define ICALVERSION "2.0"
 
-MYERRNO ics_load(const char* file, Calendar* cal) // loads ICS into RAM
-{ // TODO handle nonexisting tags
+MYERRNO ICS_load(const char* file, Calendar* cal)
+{
     assert(file != NULL && cal != NULL);
 
-    /* Count VEVENTs in file */
-    int count = 0;
-    switch (ICSVEventCounter(file, &count))
-    {
-        case FAIL_FILE_READ:
-            warning("Failed to open iCalendar file %s for reading", file);
-            return FAIL_FILE_EMPTY;
-
-        case FAIL_FILE_EMPTY:
-            warning("iCalendar file %s is empty --> ignoring", file);
-        
-        case FAIL_ICS_NOEND:
-            warning("iCalendar file %s has no END:VCALENDAR! This should be fixed ASAP");
-            break;
-
-        case SUCCESS:
-            break; // everything's in order, keep going
-
-        default:
-            warning("Something weird happened in ics_load function, please notify dev");
-            return FAIL_UNKNOWN;
-    }
-
-    /* Then create and fill database with ics contents */
-    FILE* fp;
-    fp = fopen(file, "r");
-    if (fp == NULL)
-    {
-        warning("Failed to open iCaelndar file %s for reading", file);
-        return FAIL_FILE_READ;
-    } // NOTE: no need to check for empty file as event counter has already done that
+    // TODO FINISH
     
-    Calendar cal; // TODO Calendar_create
-
-    char buff[BUFFSIZE];
-    int i = -1; // index of current event; initialised to -1 because first event shall be at index 0
-    int currentLine = 0;
-    int hasSTARTVCAL = 0;
-
-    ++currentLine;
-    fgets(buff, BUFFSIZE, fp);
-
-    while (!hasICSTag(buff, "END:VCALENDAR"))
-    {
-        if (hasICSTag(buff, "BEGIN:VCALENDAR"))
-        {
-            hasSTARTVCAL = 1;
-        }
-        
-        if (hasICSTag(buff, "BEGIN:VEVENT"))
-        {
-            ++i;
-        }
-        
-        if (i != -1) // prevent processing lines outside BEGIN/END:VEVENT tags or even outside BEGIN/END:VCALENDAR tags
-        {
-            if (hasICSTag(buff, "DTSTART"))
-            {
-                if (ICSTimeStampReader(buff + strlen("DTSTART:"), &cal->vevents[i].start) != SUCCESS)
-                {
-                    warning("Corrupt iCalendar file (invalid DTSTART at %s:%d:\n\t%s)", file, currentLine, buff);
-                    return FAIL_FILE_CORRUPT;
-                }
-            }
-            else if (hasICSTag(buff, "DTEND"))
-            {
-                if (ICSTimeStampReader(buff + strlen("DTEND:"), &cal->vevents[i].end) != SUCCESS)
-                {
-                    warning("Corrupt iCalendar file (invalid DTEND at %s:%d:\n\t%s)", file, currentLine, buff);
-                    return FAIL_FILE_CORRUPT;
-                }
-            }
-            else if (hasICSTag(buff, "SUMMARY"))
-            {
-                if (strlen(buff) > MAX_LINELENGTH)
-                {
-                    warning("iCalendar file contains SUMMARY line that exceeds limit (75 octets) at %s:%d\n\t=>Read line nevertheless, but clipped the overflowing characters", file, currentLine);
-                }
-                
-                char* tmp = malloc( (strlen(buff) - strlen("SUMMARY:")) + 1 * sizeof(char) );
-                if (tmp == NULL)
-                {
-                    warning("Could not allocate memory for SUMMARY at %s:%d", file, currentLine);
-                    return FAIL_MALLOC;
-                }
-                
-                cal->vevents[i].summary = tmp;
-                strcpy( cal->vevents[i].summary, (buff + strlen("SUMMARY:")) );
-                removeNewLineChar( cal->vevents[i].summary );
-            }
-            else if (hasICSTag(buff, "LOCATION"))
-            {
-                if (strlen(buff) > MAX_LINELENGTH)
-                {
-                    warning("iCalendar file contains LOCATION line that exceeds limit (75 octets) at %s:%d\n\t=>Read line nevertheless, but clipped the overflowing characters", file, currentLine);
-                }
-                
-                char* tmp = malloc( (strlen(buff) - strlen("LOCATION:")) + 1 * sizeof(char) );
-                if (tmp == NULL)
-                {
-                    warning("Could not allocate memory for LOCATION at %s:%d", file, currentLine);
-                    return FAIL_MALLOC;
-                }
-                
-                cal->vevents[i].location = tmp;
-                strcpy( cal->vevents[i].location, (buff + strlen("LOCATION:")) );
-                removeNewLineChar( cal->vevents[i].location );
-            }
-            else if (hasICSTag(buff, "DESCRIPTION"))
-            {
-                if (strlen(buff) > MAX_LINELENGTH)
-                {
-                    warning("iCalendar file contains DESCRIPTION line that exceeds limit (75 octets) at %s:%d\n\t=>Read line nevertheless, but clipped the overflowing characters", file, currentLine);
-                }
-                
-                char* tmp = malloc( (strlen(buff) - strlen("DESCRIPTION:")) + 1 * sizeof(char) );
-                if (tmp == NULL)
-                {
-                    warning("Could not allocate memory for DESCRIPTION at %s:%d", file, currentLine);
-                    return FAIL_MALLOC;
-                }
-                
-                cal->vevents[i].description = tmp;
-                strcpy( cal->vevents[i].description, (buff + strlen("DESCRIPTION:")) );
-                removeNewLineChar( cal->vevents[i].description );
-            }
-            else if (hasICSTag(buff, "PRIORITY"))
-            {
-                int priority;
-                if (myatoi( (buff + strlen("PRIORITY:")) , &priority) == 0)
-                {
-                    warning("Corrupt ics file (invalid PRIORITY at %s:%d)", file, currentLine);
-                }
-                
-                cal->vevents[i].priority = priority;
-            }
-        }
-        
-        // prevent infinite loop by also checking for EOF
-        if (feof(fp))
-        {
-            warning("%s contains no %s! Last line read was\n\t%s", file, "END:VCALENDAR", buff);
-            break;
-        }
-        
-        // advance
-        ++currentLine;
-        fgets(buff, BUFFSIZE, fp);
-    }
-
-    if (!hasSTARTVCAL)
-    {
-        warning("%s contains no START:VCALENDAR! Ignored the rest of file", file);
-        fclose(fp);
-        return FAIL_FILE_CORRUPT;
-    }
-
-    fclose(fp);
-
-    return SUCCESS;
-}
-    
-MYERRNO ics_write(const Calendar* cal, char* file)
-{
-    assert(cal != NULL && file != NULL);
-    
-    /* First of all, check if file exists --- if it does, ask whether to overwrite */
-    if (access(file, 0) == 0)
-    {
-        if (promptYN("File %s already exists. Overwrite?", file) == 0)
-        {
-            return FAIL_PROMPT;
-        }
-        else
-        {
-            if (remove(file) != 0)
-            {
-                return FAIL_REMOVE;
-            }
-        }
-    }
-    
-    /* Open up the file for writing */
-    FILE* fp;
-    fp = fopen(file, "w");
-    if (fp == NULL)
-    {
-        return FAIL_FILE_WRITE;
-    }
-    
-    /* Printing basic iCalendar stuff first */
-    fprintf(fp, "BEGIN:VCALENDAR\n"); 
-    fprintf(fp, "VERSION:%s\n", ICALVERSION);
-    
-    /* Printing every event, one by one */
-    for (int i = 0; i < cal->numberOfEntries; ++i)
-    {
-        fprintf(fp, "BEGIN:VEVENT\n");
-        fprintf
-            (
-                fp, "DTSTART:%04d%02d%02dT%02d%02d00\n",
-                cal->vevents[i].start.date.year,
-                cal->vevents[i].start.date.month,
-                cal->vevents[i].start.date.day,
-                cal->vevents[i].start.time.hour,
-                cal->vevents[i].start.time.minute
-            );
-        fprintf
-            (
-                fp, "DTEND:%04d%02d%02dT%02d%02d00\n",
-                cal->vevents[i].end.date.year,
-                cal->vevents[i].end.date.month,
-                cal->vevents[i].end.date.day,
-                cal->vevents[i].end.time.hour,
-                cal->vevents[i].end.time.minute
-            );
-        fprintf(fp, "SUMMARY:%s\n", cal->vevents[i].summary);
-        fprintf(fp, "LOCATION:%s\n", cal->vevents[i].location);
-        fprintf(fp, "DESCRIPTION:%s\n", cal->vevents[i].description);
-        fprintf(fp, "PRIORITY:%d\n", cal->vevents[i].priority);
-        fprintf(fp, "END:VEVENT\n");
-    }
-
-    /* Close whole iCalendar file */
-    fprintf(fp, "END:VCALENDAR");
-
-    fclose(fp);
-
-    return SUCCESS;
-}
-
-MYERRNO VEvent_add(Calendar* cal, const VEvent ve)
-{
-    assert(cal != NULL);
-
-    /* Reallocate memory for events array in cal, adding more space for another entry */
-    VEvent* tmp_vevent = realloc( cal->vevents, (sizeof(VEvent) * cal->numberOfEntries) + sizeof(VEvent) );
-    if (tmp_vevent == NULL)
-    {
-        return FAIL_REALLOC;
-    }
-
-    cal->vevents = tmp_vevent;
-
-    /* Writing input event details into newly allocated extra space */
-
-    // DTSTART & DTEND
-    cal->vevents[cal->numberOfEntries].start = ve.start;
-    cal->vevents[cal->numberOfEntries].end = ve.end;
-    
-    // SUMMARY
-    char* tmp = malloc( (strlen(ve.summary) + 1) * sizeof(char) );
-    if (tmp == NULL)
-    {
-        return FAIL_MALLOC;
-    }
-
-    cal->vevents[cal->numberOfEntries].summary = tmp;
-    strcpy(cal->vevents[cal->numberOfEntries].summary, ve.summary);
-    
-    // LOCATION
-    tmp = malloc( (strlen(ve.location) + 1) * sizeof(char) );
-    if (tmp == NULL)
-    {
-        return FAIL_MALLOC;
-    }
-
-    cal->vevents[cal->numberOfEntries].location = tmp;
-    strcpy(cal->vevents[cal->numberOfEntries].location, ve.location);
-
-    // DESCRIPTION
-    tmp = malloc( (strlen(ve.description) + 1) * sizeof(char) );
-    if (tmp == NULL)
-    {
-        return FAIL_MALLOC;
-    }
-
-    cal->vevents[cal->numberOfEntries].description = tmp;
-    strcpy(cal->vevents[cal->numberOfEntries].description, ve.description);
-
-    // PRIORITY
-    cal->vevents[cal->numberOfEntries].priority = ve.priority;
-
-    /* Increase number of entries value in structure and return pointer */
-    ++cal->numberOfEntries;
-    
-    return SUCCESS;
-}
-
-//MYERRNO Calendar_create(Calendar* cal, VEvent ve)
-//{
-//    assert(cal != NULL); // TODO isValidEvent()
-//
-//    /* First, allocate memory for a new Calendar */
-//    Calendar* tmpc = malloc( sizeof(Calendar) );
-//    if (tmpc == NULL)
-//    {
-//        warning("Failed to allocate memory for new calendar!");
-//        return FAIL_MALLOC;
-//    }
-//    cal = tmpc;
-//    
-//    /* Next, allocate memory for 'first' sentinel */
-//    VEventNode* tmpven = malloc( sizeof(VEventNode) );
-//    if (tmpven == NULL)
-//    {
-//        warning("Failed to allocate memory for new VEvent node!");
-//        return FAIL_MALLOC;
-//    }
-//    cal->first = tmpven;
-//    cal->first->prev = NULL; // sentinel marks first element
-//    
-//    /* Allocate memory for the actual VEvent and assign 'first' sentinel */
-//    tmpven = malloc( sizeof(VEventNode) );
-//    if (tmpven == NULL)
-//    {
-//        warning("Failed to allocate memory for new VEvent node!");
-//        return FAIL_MALLOC;
-//    }
-//    cal->first->next = tmpven;
-//
-//    /* Fill in data in new VEvent node */
-//    cal->first->next->ve = ve;
-//
-//    /* Allocate memory for 'last' sentinel */
-//    tmpven = malloc( sizeof(VEventNode) );
-//    if (tmpven == NULL)
-//    {
-//        warning("Failed to allocate memory for new VEvent node!");
-//        return FAIL_MALLOC;
-//    }
-//    cal->last = tmpven;
-//    cal->last->next = NULL;
-//
-//    /* Finally, connect new VEvent node and 'last' sentinel */
-//    cal->first->next->next = cal->last;
-//
-//    return SUCCESS;
-//}
-
-MYERRNO Calendar_traverse(Calendar* cal)
-{
-    assert(cal != NULL);
-
-    VEventNode* traveller = cal->first->next;
-    while (traveller != cal->last)
-    {
-        traveller = traveller->next;
-    }
-
     return SUCCESS;
 }
 
 MYERRNO Calendar_create(Calendar* cal)
 {
     assert(cal != NULL);
-
+    
+    // set number of entries to 0 since new Calendar contains no entries
     cal->numberOfEntries = 0;
     
-    VEventNode* tmpven = malloc( sizeof(VEventNode) );
+    VEventNode* tmpven;
+    /* Allocate memory for sentinels and also set cal's pointers to them */
+    tmpven = malloc( sizeof(VEventNode) );
     if (tmpven == NULL)
     {
         return FAIL_MALLOC;
     }
     cal->first = tmpven;
     
-    VEventNode* tmpven = malloc( sizeof(VEventNode) );
+    tmpven = malloc( sizeof(VEventNode) );
     if (tmpven == NULL)
     {
         return FAIL_MALLOC;
     }
     cal->last = tmpven;
-
+    
+    /* Set pointers of sentinels to correct values (NULL at endpoints) */
     cal->first->prev = NULL;
     cal->first->next = cal->last;
     
     cal->last->prev = cal->first;
     cal->last->next = NULL;
+
+    return SUCCESS;
+}
+
+MYERRNO Calendar_addVEvent(Calendar* cal, VEvent ve)
+{
+    assert(cal != NULL && isValidVEvent(ve));
+
+    // increase number of entries
+    ++cal->numberOfEntries;
+
+    VEventNode* traveller = cal->first;
+    /* Traverse Calendar to find last entry */
+    while
+        (
+            traveller->next != cal->last                                    && 
+            compareDateTime(ve.start, traveller->next->ve.start) == BEFORE  ||
+            compareDateTime(ve.end, traveller->next->ve.start) == SAME
+        )
+    {
+        traveller = traveller->next;
+    }
+    
+    /* Allocate memory for new entry and set it's pointers */
+    VEventNode* tmpven = malloc( sizeof(VEventNode) );
+    if (tmpven == NULL)
+    {
+        return FAIL_MALLOC;
+    }
+    tmpven->next = traveller->next;
+    tmpven->prev = traveller;
+    traveller->next = tmpven;
+    
+    /* Move on to new entry and fill its data with ve */
+    traveller = traveller->next;
+    traveller->ve = ve;
+
+    return SUCCESS;
+}
+
+// TODO VEvent finder?
+
+MYERRNO Calendar_deleteVEvent(Calendar* cal, VEvent ve)
+{
+    assert(cal != NULL && isValidVEvent(ve));
+
+    VEventNode* traveller = cal->first->next; // start from first real VEvent
+    /* Traverse the Calendar to find specified VEvent */
+    while (traveller->next != cal->last && compareVEvent(traveller->ve, ve))
+    {
+        traveller = traveller->next;
+    }
+    
+    if (traveller == cal->last)
+    {
+        return FAIL_VEVENT_NOT_FOUND;
+    }
+    
+    VEvent_delete(&traveller->ve);
+    
+    // set pointers (tear out link at deletion point)
+    traveller->prev->next = traveller->next;
+    traveller->next->prev = traveller->prev;
+
+    free(traveller);
+
+    return SUCCESS;
+}
+
+MYERRNO VEvent_delete(VEvent* ve)
+{
+    assert(ve != NULL);
+
+    free(ve->summary);
+    free(ve->location);
+    free(ve->description);
 
     return SUCCESS;
 }

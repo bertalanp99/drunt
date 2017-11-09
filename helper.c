@@ -32,55 +32,82 @@ int hasICSTag(const char* str, const char* tag)
     return !strncmp(str, tag, strlen(tag));
 }
 
-MYERRNO ICSVEventCounter(const char* file, int* count)
+MYERRNO ICSVEventCounter(const char* file, int* n)
 {
-    assert (file != NULL && count != NULL);
+    assert(file != NULL && n != NULL);
+
+    /* Reset counter to zero and attempt to open file for reading */
+    *n = 0;
+
+    FILE* fp = fopen(file, "r");
+    if (fp == NULL)
+    {
+        return FAIL_FILE_READ;
+    }
+
+    // TODO isValidICS function
+
+    return SUCCESS;
+}
+
+int isValidICS(const char* file)
+{
+    assert(file != NULL);
     
-    /* Attempt to open file */
-    FILE* fp;
-    fp = fopen(file, "r");
+    if (isNonEmptyFile(file) != SUCCESS)
+    {
+        return FAIL_FILE_EMPTY;
+    }
+
+    FILE* fp = fopen(file, "r");
+    if (fp == NULL)
+    {
+        return FAIL_FILE_READ;
+    }
+
+    /* Go through the file line by line; if a line starting with BEGIN is found, look
+     * for a closing END at heads of lines. If no END is found or another BEGIN of same
+     * type is found, the ICS file is corrupt */
+
+    char* buff[BUFFSIZE];
+    while (fgets(buff, sizeof buff, fp) != NULL)
+    {
+        if (strncmp(buff, "BEGIN:", strlen("BEGIN:")) == 0)
+        {
+            // TODO cont
+        }
+    }
+
+    return 1;
+}
+    
+}
+
+MYERRNO isNonEmptyFile(const char* file)
+{
+    assert(file != NULL);
+
+    FILE* fp = fopen(file, "r");
     if (fp == NULL)
     {
         return FAIL_FILE_READ;
     }
     
-    /* Create buffer to read lines into */
-    char buff[BUFFSIZE];
-    
-    *count = 0;
-    int currentLine = 0;
-
-    /* Read first line and check whether file is empty */
-    ++currentLine;
-    if (fgets(buff, BUFFSIZE, fp) == NULL)
+    /* Go to end of file and check ftell() */
+    fseek(fp, 0, SEEK_END);
+    if (ftell(fp) != 0)
+    {
+        return SUCCESS;
+    }
+    else
     {
         return FAIL_FILE_EMPTY;
     }
 
-    /* Read other lines and count occurrences of VEVENTs */
-    while(!hasICSTag(buff, "END:VCALENDAR"))
-    {
-        ++ currentLine;
-
-        if (hasICSTag(buff, "BEGIN:VEVENT"))
-        {
-            ++*count;
-        }
-
-        // prevent infinite loop by also checking for EOF
-        if (feof(fp))
-        {
-            warning("iCalendar file %s contains no END:VCALENDAR! Last line read was %s:%d:\n\t%s", file, file, currentLine, buff);
-            return FAIL_ICS_NOEND;
-        }
-
-        fgets(buff, BUFFSIZE, fp);
-    }
-
     fclose(fp);
-
-    return SUCCESS;
 }
+
+
 
 MYERRNO ICSTimeStampReader(const char* str, DateTime* dt)
 {
@@ -189,10 +216,135 @@ int isValidMinute(const int minute)
     return (minute >= 0 && minute < 60);
 }
 
-/*int isValidDate(const Date d)
+int isValidDate(const Date d)
 {
-    // TODO create
-}*/
+    return ( isValidYear(d.year) && isValidMonth(d.month) && isValidDay(d.day) );
+}
+
+int isValidTime(const Time t)
+{
+    return ( isValidHour(t.hour) && isValidMinute(t.minute) );
+}
+
+int isValidDateTime(const DateTime dt)
+{
+    return ( isValidDate(dt.date) && isValidTime(dt.time) );
+}
+
+int isValidVEvent(const VEvent ve)
+{
+    return
+        ( 
+            isValidDateTime(ve.start)   &&
+            isValidDateTime(ve.end)     &&
+            ve.summary != NULL          &&
+            ve.location != NULL         &&
+            ve.description != NULL
+        );
+}
+
+RELATIVEDATE compareDateTime(const DateTime dt1, const DateTime dt2)
+{
+    if (compareDate(dt1.date, dt2.date) == BEFORE)
+    {
+        return BEFORE;
+    }
+    else if (compareDate(dt1.date, dt2.date) == AFTER)
+    {
+        return AFTER;
+    }
+    else
+    {
+        if (compareTime(dt1.time, dt2.time) == BEFORE)
+        {
+            return BEFORE;
+        }
+        else if (compareTime(dt1.time, dt2.time) == AFTER)
+        {
+            return AFTER;
+        }
+        else
+        {
+            return SAME;
+        }
+    }
+}
+
+RELATIVEDATE compareDate(const Date d1, const Date d2)
+{
+   if (!isValidDate(d1) || !isValidDate(d2))
+   {
+       return ERROR;
+   }
+
+   if (d1.year < d2.year)
+   {
+       return BEFORE;
+   }
+   else if (d1.year > d2.year)
+   {
+       return AFTER;
+   }
+   else
+   {
+       if (d1.month < d2.month)
+       {
+            return BEFORE;
+       }
+       else if (d1.month > d2.month)
+       {
+           return AFTER;
+       }
+       else
+       {
+           if (d1.day < d2.day)
+           {
+               return BEFORE;
+           }
+           else if (d1.day > d2.day)
+           {
+               return AFTER;
+           }
+           else
+           {
+               return SAME;
+           }
+       }
+   }
+}
+
+RELATIVEDATE compareTime(const Time t1, const Time t2)
+{
+    if (!isValidTime(t1) || !isValidTime(t2))
+    {
+        return ERROR;
+    }
+
+    if (t1.hour < t2.hour)
+    {
+        return BEFORE;
+    }
+    else if (t1.hour > t2.hour)
+    {
+        return AFTER;
+    }
+    else
+    {
+        if (t1.minute < t2.minute)
+        {
+            return BEFORE;
+        }
+        else if (t1.minute > t2.minute)
+        {
+            return AFTER;
+        }
+        else
+        {
+            return SAME;
+        }
+    }
+}
+    
 
 void removeNewLineChar( char* str )
 {
@@ -287,3 +439,17 @@ int promptYN(char* message, ...)
             return 0;
     }
 }
+
+int compareVEvent(const VEvent ve1, const VEvent ve2)
+{
+    return
+        (
+            compareDateTime(ve1.start, ve2.start) == SAME   &&
+            compareDateTime(ve1.end, ve2.end) == SAME       &&
+            strcmp(ve1.summary, ve2.summary) == 0           &&
+            strcmp(ve1.location, ve2.location) == 0         &&
+            strcmp(ve1.description, ve2.description) == 0   &&
+            ve1.priority == ve2.priority
+        );
+}
+
