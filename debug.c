@@ -1,24 +1,33 @@
 #include "debug.h"
+#include "structs.h"
 
 #include <stdio.h>
-#include <assert.h>
+#include <stdlib.h>
 
-void printRawCalendar(Calendar cal)
+
+void printCalendar_raw(const Calendar* cal)
 {
-    for (int i = 0; i < cal.numberOfEntries; ++i)
+    VEventNode* traveller = cal->first->next;
+    while (traveller->next != NULL)
     {
-        printRawVEvent(cal.vevents[i]);
-        printf("\n");
+        printVEventNode_raw(traveller);
+        printf("\n\n\n");
     }
+
+    printf("Finished printing calendar!");
 }
 
-void printRawVEvent(VEvent ve)
+void printVEventNode_raw(const VEventNode* ven)
 {
-    printf("From: %d/%d/%d %d.%d\n", ve.start.date.year, ve.start.date.month, ve.start.date.day, ve.start.time.hour, ve.start.time.minute);
-    printf("To: %d/%d/%d %d.%d\n", ve.end.date.year, ve.end.date.month, ve.end.date.day, ve.end.time.hour, ve.end.time.minute);
-    assert(ve.summary != NULL);
-    printf("Summary: %s\n", ve.summary);
-    printf("Location: %s\n", ve.location);
-    printf("Description: %s\n", ve.description);
-    printf("Priority: %d\n", ve.priority);
+    printf("Starting DateTime: %d/%d/%d %d.%d\n",
+        ven->ve.start.date.year, ven->ve.start.date.month, ven->ve.start.date.day,
+        ven->ve.start.time.hour, ven->ve.start.time.minute);
+    printf("Ending DateTime: %d/%d/%d %d.%d\n",
+        ven->ve.end.date.year, ven->ve.end.date.month, ven->ve.end.date.day,
+        ven->ve.end.time.hour, ven->ve.end.time.minute);
+    printf("Summary: %s\n", ven->ve.summary);
+    printf("Location: %s\n", ven->ve.location);
+    printf("Description: %s\n", ven->ve.description);
+    printf("Priority: %d\n", ven->ve.priority);
 }
+    

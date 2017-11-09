@@ -3,8 +3,8 @@
 
 #include "structs.h"
 
-void printRawCalendar(Calendar);
+void printCalendar_raw(const Calendar*);
 
-void printRawVEvent(VEvent);
+void printVEventNode_raw(const VEventNode*);
 
 #endif

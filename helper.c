@@ -36,6 +36,11 @@ MYERRNO ICSVEventCounter(const char* file, int* n)
 {
     assert(file != NULL && n != NULL);
 
+    if (!isValidICS(file))
+    {
+        return FAIL_FILE_CORRUPT;
+    }
+
     /* Reset counter to zero and attempt to open file for reading */
     *n = 0;
 
@@ -45,7 +50,17 @@ MYERRNO ICSVEventCounter(const char* file, int* n)
         return FAIL_FILE_READ;
     }
 
-    // TODO isValidICS function
+    /* Counting only BEGIN:VEVENT lines is safe because ICS validity has already been checked */
+    char buff[BUFFSIZE];
+    while(fgets(buff, sizeof buff, fp) != NULL)
+    {
+        if ( !strcmp(buff, "BEGIN:VEVENT") )
+        {
+            ++*n;
+        }
+    }
+
+    fclose(fp);
 
     return SUCCESS;
 }
@@ -56,31 +71,186 @@ int isValidICS(const char* file)
     
     if (isNonEmptyFile(file) != SUCCESS)
     {
-        return FAIL_FILE_EMPTY;
+        return 0; // empty file
     }
 
     FILE* fp = fopen(file, "r");
     if (fp == NULL)
     {
-        return FAIL_FILE_READ;
+        return 0; // unable to read
     }
 
     /* Go through the file line by line; if a line starting with BEGIN is found, look
      * for a closing END at heads of lines. If no END is found or another BEGIN of same
      * type is found, the ICS file is corrupt */
 
-    char* buff[BUFFSIZE];
-    while (fgets(buff, sizeof buff, fp) != NULL)
+    char buff[BUFFSIZE];
+    int endCalendarFlag = 0;
+    int beginVEventFlag = 0;
+
+    int DTSTARTFlag = 0;
+    int DTENDFlag = 0;
+    int summaryFlag = 0;
+    int locationFlag = 0;
+    int descriptionFlag = 0;
+    int priorityFlag = 0;
+
+    // check first line first
+    fgets(buff, sizeof buff, fp);
+    if ( strcmp(buff, "BEGIN:VCALENDAR") )
     {
-        if (strncmp(buff, "BEGIN:", strlen("BEGIN:")) == 0)
-        {
-            // TODO cont
-        }
+        return 0; // first line is not BEGIN:VCALENDAR
     }
 
-    return 1;
+    // check other lines
+    while (fgets(buff, sizeof buff, fp) != NULL)
+    {
+        if (endCalendarFlag)
+        {
+            return 0; // content found after END:VCALENDAR
+        }
+        else if ( !strcmp(buff, "BEGIN:VCALENDAR") )
+        {
+            return 0; // nested VCALENDARs are illegal
+        }
+        else if ( !strcmp(buff, "END:VCALENDAR") )
+        {
+            if (beginVEventFlag)
+            {
+                return 0; // calendar ends without closing an open VEVENT
+            }
+            else
+            {
+                endCalendarFlag = 1;
+            }
+        }
+        else if ( !strcmp(buff, "BEGIN:VEVENT") )
+        {   
+            if (beginVEventFlag)
+            {
+                return 0; // nested VEVENTs are illegal
+            }
+            else
+            {
+                beginVEventFlag = 1;
+            }
+        }
+        else if ( !strcmp(buff, "END:VEVENT") )
+        {
+            if (!beginVEventFlag)
+            {
+                return 0; // END:VEVENT without preceding BEGIN:VEVENT is illegal
+            }
+            else
+            {
+                if (DTSTARTFlag && DTENDFlag && summaryFlag && locationFlag && descriptionFlag && priorityFlag)
+                {
+                    beginVEventFlag = 0;
+                }
+                else
+                {
+                    return 0; // VEVENT block missing required details
+                }
+            }
+        }
+        else if ( !strncmp(buff, "DTSTART:", strlen("DTSTART:")) )
+        {
+            if (!beginVEventFlag)
+            {
+                return 0; // DTSTART outside VEVENT
+            }
+            else
+            {
+                DTSTARTFlag = isValidICSTimeStamp(buff + strlen("DTSTART:"));
+            }
+        }
+        else if ( !strncmp(buff, "DTEND:", strlen("DTEND:")) )
+        {
+            if (!beginVEventFlag)
+            {
+                return 0; // DTEND oustide VEVENT
+            }
+            else
+            {
+                DTENDFlag = isValidICSTimeStamp(buff + strlen("DTEND:"));
+            }
+        }
+        else if ( !strncmp(buff, "SUMMARY:", strlen("SUMMARY:")) )
+        {
+            if (!beginVEventFlag)
+            {
+                return 0; // SUMMARY outside VEVENT
+            }
+            else
+            {
+                summaryFlag = 1;
+            }
+        }
+        else if ( !strncmp(buff, "LOCATION:", strlen("SUMMARY:")) )
+        {
+            if (!beginVEventFlag)
+            {
+                return 0; // LOCATION outside VEVENT
+            }
+            else
+            {
+                locationFlag = 1;
+            }
+        }
+        else if ( !strncmp(buff, "DESCRIPTION:", strlen("DESCRIPTION:")) )
+        {
+            if (!beginVEventFlag)
+            {
+                return 0; // DESCRIPTION outside VEVENT
+            }
+            else
+            {
+                descriptionFlag = 1;
+            }
+        }
+        else if ( !strncmp(buff, "PRIORITY:", strlen("PRIORITY:")) )
+        {
+            if (!beginVEventFlag)
+            {
+                return 0; // PRIORITY outside VEVENT
+            }
+            else
+            {
+                priorityFlag = 1;
+            }
+        }
+        // TODO check for other tags
+    }
+
+    if (!endCalendarFlag)
+    {
+        return 0; // calendar has not been closed
+    }
+    else
+    {
+        return 1;
+    }
+
+    fclose(fp);
 }
-    
+
+int isValidICSTimeStamp(const char* timestamp)
+{
+    assert(timestamp != NULL && !strcmp(timestamp, ""));
+   
+    // temporarily myatoi() everything and also check their validity
+    char buff[4];
+    int tmp;
+    return
+        (
+            myatoi(strncpy(buff, timestamp, 4), &tmp)       && isValidYear(tmp)     &&
+            myatoi(strncpy(buff, timestamp + 4, 2), &tmp)   && isValidMonth(tmp)    &&
+            myatoi(strncpy(buff, timestamp + 6, 2), &tmp)   && isValidDay(tmp)      &&
+            myatoi(strncpy(buff, timestamp + 9, 2), &tmp)   && isValidHour(tmp)     &&
+            myatoi(strncpy(buff, timestamp + 11, 2), &tmp)  && isValidMinute(tmp)   &&
+            // TODO deal with seconds?
+            (*(timestamp + 15) == '\0')
+        );
 }
 
 MYERRNO isNonEmptyFile(const char* file)
@@ -90,6 +260,7 @@ MYERRNO isNonEmptyFile(const char* file)
     FILE* fp = fopen(file, "r");
     if (fp == NULL)
     {
+        perror(file);
         return FAIL_FILE_READ;
     }
     
@@ -109,84 +280,27 @@ MYERRNO isNonEmptyFile(const char* file)
 
 
 
-MYERRNO ICSTimeStampReader(const char* str, DateTime* dt)
+MYERRNO ICSTimeStampReader(const char* ts, DateTime* dt)
 {
-    /* Format of iCalendar timestamp: YYYYMMDDTHHMMSS --- ex gr 20171112T090000 = 2017/11/12 09.00.00 (we are not going to use seconds for anything) */
+    /* Format of iCalendar timestamp: YYYYMMDDTHHMMSS
+     * ex gr 20171112T090000 = 2017/11/12 09.00.00
+     * (we are not going to use seconds for anything) */
 
-    assert( str != NULL && dt != NULL && strcmp(str, "") );
+    assert( ts != NULL && dt != NULL);
 
-    int year;
-    int month;
-    int day;
-    
-    int hour;
-    int minute;
-    
-    /* Interpret the input string and check for errors each time (myatoi()'s return comes in handy) */
-    char buff[4]; // the longest string part is the year, which is 4 characters long
-
-    // year
-    strncpy(buff, str, 4);
-    if (myatoi(buff, &year) == 0)
+    if ( !isValidICSTimeStamp(ts) )
     {
-        return FAIL_MYATOI;
-    }
-    if (!isValidYear(year))
-    {
-        return FAIL_VALUE_INVALID_YEAR;
+        return FAIL_TIMESTAMP_CORRUPT;
     }
 
-    // month
-    strncpy(buff, (str + 4), 2);
-    buff[2] = '\0'; // stupid strncpy() does not do this
-    if (myatoi(buff, &month) == 0)
-    {
-        return FAIL_MYATOI;
-    }
-    if (!isValidMonth(month))
-    {
-        return FAIL_VALUE_INVALID_MONTH;
-    }
+    /* No need to check for anything, isValidICSTimeStamp() has already done that */
+    char buff[4];
 
-    // day
-    strncpy(buff, (str + 6), 2);
-    if (myatoi(buff, &day) == 0)
-    {
-        return FAIL_MYATOI;
-    }
-    if (!isValidDay(day))
-    {
-        return FAIL_VALUE_INVALID_DAY;
-    }
-
-    // hour
-    strncpy(buff, (str + 9), 2);
-    if (myatoi(buff, &hour) == 0)
-    {
-        return FAIL_MYATOI;
-    }
-    if (!isValidHour(hour))
-    {
-        return FAIL_VALUE_INVALID_HOUR;
-    }
-
-    // minute
-    strncpy(buff, (str + 11), 2);
-    if (myatoi(buff, &minute) == 0)
-    {
-        return FAIL_MYATOI;
-    }
-    if (!isValidMinute(minute))
-    {
-        return FAIL_VALUE_INVALID_MINUTE;
-    }
-    
-    /* Seemingly, no errors were encountered --- set values */
-    dt->date.year = year;
-    dt->date.month = month;
-    dt->date.day = day;
-    dt->time.hour = hour;
-    dt->time.minute = minute;
+    myatoi(strncpy(buff, ts, 4), &dt->date.year);
+    myatoi(strncpy(buff, ts + 4, 2), &dt->date.month);
+    myatoi(strncpy(buff, ts + 6, 2), &dt->date.day);
+    myatoi(strncpy(buff, ts + 9, 2), &dt->time.hour);
+    myatoi(strncpy(buff, ts + 11, 2), &dt->time.minute);
 
     return SUCCESS;
 }

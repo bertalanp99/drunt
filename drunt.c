@@ -2,73 +2,21 @@
 #include "dbHandler.h"
 #include "debug.h"
 #include "errorHandler.h"
+#include "helper.h"
 
 #include <stdlib.h>
 #include <string.h>
 
 int main(int argc, char *argv[])
 {
-    if (strcmp(argv[1], "--list") == 0 || strcmp(argv[1], "-l") == 0)
-    {
-        Calendar mycalendar = { .numberOfEntries = 0, .vevents = NULL };
-        ics_load("cal.ics", &mycalendar);
-        printRawCalendar(mycalendar);
-        free(mycalendar.vevents); // TODO calendar destroyer
-   }
-    else if (strcmp(argv[1], "--add") == 0 || strcmp(argv[1], "-a") == 0)
-    {
-        // TODO event adder
-    }
-    else if (strcmp(argv[1], "-temp") == 0)
-    {
-        Calendar mycalendar = { .numberOfEntries = 0, .vevents = NULL };
-        ics_load("cal.ics", &mycalendar);
-        VEvent myvevent = {
-            .start ={   .date = {   .year = 2017,
-                                    .month = 12,
-                                    .day = 15
-                                }, 
-                        .time = {   .hour = 11,
-                                    .minute = 0
-                                }
-                    },
-            .end =  {   .date = {   .year = 2017,
-                                    .month = 12,
-                                    .day = 15
-                                }, 
-                        .time = {   .hour = 12,
-                                    .minute = 0
-                                }
-                    },
-            .summary = "Tüntetés a kacsák egyenjogúsága ellen",
-            .location= "New York",
-            .description = "Sálálálá",
-            .priority = 10
-        };
-        
-        if (VEvent_add(&mycalendar, myvevent) == 0)
-        {
-            die("Fuck! Event adder did not work");
-        }
+    printf("Reading ICS...\n");
+    Calendar cal;
+    Calendar_create(&cal);
+    ICS_load("neptun.ics", &cal);
+    
+    printf("Printing calendar raw below (PLEASE!!!)\n\n\n"); 
 
-        if(ics_write(&mycalendar, "newCal.ics") == 0)
-        {
-            die("File already exists");
-        }
-
-        free(mycalendar.vevents); // ahem...
-    }
-    else if (strcmp(argv[1], "-temp2") == 0) // load & write
-    {
-        Calendar mycalendar = { .numberOfEntries = 0, .vevents = NULL };
-        ics_load("cal.ics", &mycalendar);
-        if (ics_write(&mycalendar, "newCal.ics") == 0)
-        {
-            die("File already exists");
-        }
-
-        free(mycalendar.vevents);
-    }
+    printCalendar_raw(&cal);
 
     return 0;
 }
