@@ -23,9 +23,9 @@ int main(int argc, char *argv[])
     printf("Reading ICS...\n");
     Calendar cal;
     Calendar_create(&cal);
-    ICS_load("neptun.ics", &cal);
+    ICS_load("cal.ics", &cal);
     
-    printf("Printing calendar raw below (PLEASE!!!)\n\n\n"); 
+    printf("Printing calendar raw below\n\n\n"); 
 
     printCalendar_raw(&cal);
 

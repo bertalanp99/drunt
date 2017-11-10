@@ -54,7 +54,7 @@ MYERRNO ICSVEventCounter(const char* file, int* n)
     char buff[BUFFSIZE];
     while(fgets(buff, sizeof buff, fp) != NULL)
     {
-        if ( !strcmp(buff, "BEGIN:VEVENT") )
+        if ( !strcmp(buff, "BEGIN:VEVENT\n") || !strcmp(buff, "BEGIN:VEVENT\r\n") )
         {
             ++*n;
         }
@@ -97,7 +97,7 @@ int isValidICS(const char* file)
 
     // check first line first
     fgets(buff, sizeof buff, fp);
-    if ( strcmp(buff, "BEGIN:VCALENDAR") )
+    if ( strcmp(buff, "BEGIN:VCALENDAR\n") && strcmp(buff, "BEGIN:VCALENDAR\r\n") )
     {
         return 0; // first line is not BEGIN:VCALENDAR
     }
@@ -109,11 +109,11 @@ int isValidICS(const char* file)
         {
             return 0; // content found after END:VCALENDAR
         }
-        else if ( !strcmp(buff, "BEGIN:VCALENDAR") )
+        else if ( !strcmp(buff, "BEGIN:VCALENDAR\n") || !strcmp(buff, "BEGIN:VCALENDAR\r\n") )
         {
             return 0; // nested VCALENDARs are illegal
         }
-        else if ( !strcmp(buff, "END:VCALENDAR") )
+        else if ( !strcmp(buff, "END:VCALENDAR\n") || !strcmp(buff, "END:VCALENDAR\r\n") )
         {
             if (beginVEventFlag)
             {
@@ -124,7 +124,7 @@ int isValidICS(const char* file)
                 endCalendarFlag = 1;
             }
         }
-        else if ( !strcmp(buff, "BEGIN:VEVENT") )
+        else if ( !strcmp(buff, "BEGIN:VEVENT\n") || !strcmp(buff, "BEGIN:VEVENT\r\n") )
         {   
             if (beginVEventFlag)
             {
@@ -135,7 +135,7 @@ int isValidICS(const char* file)
                 beginVEventFlag = 1;
             }
         }
-        else if ( !strcmp(buff, "END:VEVENT") )
+        else if ( !strcmp(buff, "END:VEVENT\n") || !strcmp(buff, "END:VEVENT\r\n") )
         {
             if (!beginVEventFlag)
             {
@@ -236,7 +236,7 @@ int isValidICS(const char* file)
 
 int isValidICSTimeStamp(const char* timestamp)
 {
-    assert(timestamp != NULL && !strcmp(timestamp, ""));
+    assert(timestamp != NULL && strcmp(timestamp, ""));
    
     // temporarily myatoi() everything and also check their validity
     char buff[4];
