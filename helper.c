@@ -85,6 +85,8 @@ int isValidICS(const char* file)
      * type is found, the ICS file is corrupt */
 
     char buff[BUFFSIZE];
+    int currentLine = -1;
+
     int endCalendarFlag = 0;
     int beginVEventFlag = 0;
 
@@ -97,7 +99,9 @@ int isValidICS(const char* file)
 
     // check first line first
     fgets(buff, sizeof buff, fp);
-    if ( strcmp(buff, "BEGIN:VCALENDAR\n") && strcmp(buff, "BEGIN:VCALENDAR\r\n") )
+    ++currentLine;
+    removeNewLineChar(buff);
+    if ( strcmp(buff, "BEGIN:VCALENDAR") )
     {
         return 0; // first line is not BEGIN:VCALENDAR
     }
@@ -105,18 +109,23 @@ int isValidICS(const char* file)
     // check other lines
     while (fgets(buff, sizeof buff, fp) != NULL)
     {
+        ++currentLine;
+        removeNewLineChar(buff);
         if (endCalendarFlag)
         {
+            warning("Content found after END:VCALENDAR at %s:%d\n[ => ]\t%s", file, currentLine, buff);
             return 0; // content found after END:VCALENDAR
         }
-        else if ( !strcmp(buff, "BEGIN:VCALENDAR\n") || !strcmp(buff, "BEGIN:VCALENDAR\r\n") )
+        else if ( !strcmp(buff, "BEGIN:VCALENDAR") )
         {
+            warning("Nested VCALENDAR at %s:%d\n[ => ]\t%s", file, currentLine, buff);
             return 0; // nested VCALENDARs are illegal
         }
-        else if ( !strcmp(buff, "END:VCALENDAR\n") || !strcmp(buff, "END:VCALENDAR\r\n") )
+        else if ( !strcmp(buff, "END:VCALENDAR") )
         {
             if (beginVEventFlag)
             {
+                warning("%s has END:VCALENDAR while there's still an open VEVENT at line %d\n[ => ]\t%s", file, currentLine, buff);
                 return 0; // calendar ends without closing an open VEVENT
             }
             else
@@ -124,10 +133,11 @@ int isValidICS(const char* file)
                 endCalendarFlag = 1;
             }
         }
-        else if ( !strcmp(buff, "BEGIN:VEVENT\n") || !strcmp(buff, "BEGIN:VEVENT\r\n") )
+        else if ( !strcmp(buff, "BEGIN:VEVENT") )
         {   
             if (beginVEventFlag)
             {
+                warning("Nested VEVENT at %s:%d\n[ => ]\t%s", file, currentLine, buff);
                 return 0; // nested VEVENTs are illegal
             }
             else
@@ -135,10 +145,11 @@ int isValidICS(const char* file)
                 beginVEventFlag = 1;
             }
         }
-        else if ( !strcmp(buff, "END:VEVENT\n") || !strcmp(buff, "END:VEVENT\r\n") )
+        else if ( !strcmp(buff, "END:VEVENT") )
         {
             if (!beginVEventFlag)
             {
+                warning("Found END:VEVENT tag without preceding BEGIN:VEVENT at %s:%d\n[ => ]\t%s", file, currentLine, buff);
                 return 0; // END:VEVENT without preceding BEGIN:VEVENT is illegal
             }
             else
@@ -146,9 +157,16 @@ int isValidICS(const char* file)
                 if (DTSTARTFlag && DTENDFlag && summaryFlag && locationFlag && descriptionFlag && priorityFlag)
                 {
                     beginVEventFlag = 0;
+                    DTSTARTFlag = 0;
+                    DTENDFlag = 0;
+                    summaryFlag = 0;
+                    locationFlag = 0;
+                    descriptionFlag = 0;
+                    priorityFlag = 0;
                 }
                 else
                 {
+                    warning("%s has event block that misses required details at line %d\n[ => ]\t%s", file, currentLine, buff);
                     return 0; // VEVENT block missing required details
                 }
             }
@@ -157,6 +175,7 @@ int isValidICS(const char* file)
         {
             if (!beginVEventFlag)
             {
+                warning("Found DTSTART outside VEVENT block at %s:%d\n[ => ]\t%s", file, currentLine, buff);
                 return 0; // DTSTART outside VEVENT
             }
             else
@@ -168,6 +187,7 @@ int isValidICS(const char* file)
         {
             if (!beginVEventFlag)
             {
+                warning("Found DTEND outside VEVENT block at %s:%d\n[ => ]\t%s", file, currentLine, buff);
                 return 0; // DTEND oustide VEVENT
             }
             else
@@ -179,6 +199,7 @@ int isValidICS(const char* file)
         {
             if (!beginVEventFlag)
             {
+                warning("Found SUMMARY outside VEVENT block at %s:%d\n[ => ]\t%s", file, currentLine, buff);
                 return 0; // SUMMARY outside VEVENT
             }
             else
@@ -190,6 +211,7 @@ int isValidICS(const char* file)
         {
             if (!beginVEventFlag)
             {
+                warning("Found LOCATION outside VEVENT block at %s:%d\n[ => ]\t%s", file, currentLine, buff);
                 return 0; // LOCATION outside VEVENT
             }
             else
@@ -201,6 +223,7 @@ int isValidICS(const char* file)
         {
             if (!beginVEventFlag)
             {
+                warning("Found DESCRIPTION outside VEVENT block at %s:%d\n[ => ]\t%s", file, currentLine, buff);
                 return 0; // DESCRIPTION outside VEVENT
             }
             else
@@ -212,6 +235,7 @@ int isValidICS(const char* file)
         {
             if (!beginVEventFlag)
             {
+                warning("Found PRIORTY outside VEVENT block at %s:%d\n[ => ]\t%s", file, currentLine, buff);
                 return 0; // PRIORITY outside VEVENT
             }
             else
@@ -224,6 +248,7 @@ int isValidICS(const char* file)
 
     if (!endCalendarFlag)
     {
+        warning("%s has no END:VCALENDAR! Last read line was:\n[ => ]\t%s", file, buff);
         return 0; // calendar has not been closed
     }
     else
@@ -241,6 +266,7 @@ int isValidICSTimeStamp(const char* timestamp)
     // temporarily myatoi() everything and also check their validity
     char buff[8]; // 4+1 would be enough though
     int tmp;
+
     return
         (
             myatoi(mystrncpy(buff, timestamp, 4), &tmp)       && isValidYear(tmp)     &&
@@ -249,19 +275,13 @@ int isValidICSTimeStamp(const char* timestamp)
             myatoi(mystrncpy(buff, timestamp + 9, 2), &tmp)   && isValidHour(tmp)     &&
             myatoi(mystrncpy(buff, timestamp + 11, 2), &tmp)  && isValidMinute(tmp)   &&
             // TODO deal with seconds?
-            (
-                *(timestamp + 15) == '\0'                                   ||
-                *(timestamp + 15) == '\n'                                   || 
-                ( *(timestamp + 15) == '\r' && *(timestamp + 16) == '\n' )  ||
-                ( *(timestamp + 15) == 'Z' && // unly ZULU
-                    (
-                        *(timestamp + 16) == '\0' ||
-                        *(timestamp + 16) == '\n' ||
-                        ( *(timestamp + 16) == '\r' && *(timestamp + 17) == '\n' )
-                    )
-                )
-            ) // stupid DOS text files
+            timestamp[15] == 'Z' // only ZULU timestamps supported as of yet
         );
+}
+
+int hasNewLineChar(const char* str)
+{
+    return ( str[strlen(str) - 1] == '\n' || strcmp(str + strlen(str) - 2, "\r\n") );
 }
 
 char* mystrncpy(char* dest, const char* src, const int len)
@@ -375,6 +395,11 @@ int isValidVEvent(const VEvent ve)
 
 RELATIVEDATE compareDateTime(const DateTime dt1, const DateTime dt2)
 {
+    if ( !isValidDateTime(dt1) || !isValidDateTime(dt2) )
+    {
+        return ERROR;
+    }
+    
     if (compareDate(dt1.date, dt2.date) == BEFORE)
     {
         return BEFORE;
@@ -383,7 +408,7 @@ RELATIVEDATE compareDateTime(const DateTime dt1, const DateTime dt2)
     {
         return AFTER;
     }
-    else
+    else // dt1 & dt2 are on the same day, check time
     {
         if (compareTime(dt1.time, dt2.time) == BEFORE)
         {
@@ -393,7 +418,7 @@ RELATIVEDATE compareDateTime(const DateTime dt1, const DateTime dt2)
         {
             return AFTER;
         }
-        else
+        else // both time and date match
         {
             return SAME;
         }
@@ -415,7 +440,7 @@ RELATIVEDATE compareDate(const Date d1, const Date d2)
    {
        return AFTER;
    }
-   else
+   else // same year, check month
    {
        if (d1.month < d2.month)
        {
@@ -425,7 +450,7 @@ RELATIVEDATE compareDate(const Date d1, const Date d2)
        {
            return AFTER;
        }
-       else
+       else // same month too, check day
        {
            if (d1.day < d2.day)
            {
@@ -435,7 +460,7 @@ RELATIVEDATE compareDate(const Date d1, const Date d2)
            {
                return AFTER;
            }
-           else
+           else // same year, month, day, meaning two dates match
            {
                return SAME;
            }
@@ -458,7 +483,7 @@ RELATIVEDATE compareTime(const Time t1, const Time t2)
     {
         return AFTER;
     }
-    else
+    else // same hour, check minute
     {
         if (t1.minute < t2.minute)
         {
@@ -468,19 +493,25 @@ RELATIVEDATE compareTime(const Time t1, const Time t2)
         {
             return AFTER;
         }
-        else
+        else // same hour and same minute, meaning two 'times' must match
         {
             return SAME;
         }
     }
 }
     
-
 void removeNewLineChar( char* str )
 {
-    assert(str != NULL && ( str[strlen(str) - 1] == '\n' || (str[strlen(str) - 2] == '\r' && str[strlen(str) - 1] == '\n')) );
+    assert(str != NULL && hasNewLineChar(str) );
 
-    str[strlen(str) - 1] = '\0';
+    if ( str[strlen(str) - 2] == '\r' )
+    {
+        str[strlen(str) - 2] = '\0';
+    }
+    else
+    {
+        str[strlen(str) - 1] = '\0';
+    }
 }
 
 int myatoi(const char* str, int* out) // TODO CREDIT THIS FUNCTION TO "https://stackoverflow.com/a/26083517/6860707"

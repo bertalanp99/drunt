@@ -23,17 +23,6 @@ MYERRNO ICS_load(const char* file, Calendar* cal)
     }
 
     cal->numberOfEntries = 0;
-    switch (ICSVEventCounter(file, &cal->numberOfEntries))
-    {
-        case FAIL_FILE_CORRUPT:
-            return FAIL_FILE_CORRUPT;
-        
-        case FAIL_FILE_READ:
-            return FAIL_FILE_READ;
-
-        default:
-            break;
-    }
 
     /* Process file */
     FILE* fp = fopen(file, "r");
@@ -48,10 +37,11 @@ MYERRNO ICS_load(const char* file, Calendar* cal)
     while (fgets(buff, sizeof buff, fp) != NULL)
     {
         ++currentLine;
-        if ( !strcmp(buff, "BEGIN:VEVENT\n") || !strcmp(buff, "BEGIN:VEVENT\r\n") )
+        removeNewLineChar(buff);
+        if ( !strcmp(buff, "BEGIN:VEVENT") )
         {
             VEvent ve;
-            while ( strcmp(buff, "END:VEVENT\n") && strcmp(buff, "END:VEVENT\r\n") )
+            while ( strcmp(buff, "END:VEVENT") )
             {
                 if ( !strncmp(buff, "DTSTART:", strlen("DTSTART:")) )
                 {
@@ -86,7 +76,6 @@ MYERRNO ICS_load(const char* file, Calendar* cal)
 
                     ve.summary = tmp;
                     strcpy(ve.summary, buff + strlen("SUMMARY:"));
-                    removeNewLineChar(ve.summary);
                 }
                 else if ( !strncmp(buff, "LOCATION:", strlen("LOCATION:")) )
                 {
@@ -105,7 +94,6 @@ MYERRNO ICS_load(const char* file, Calendar* cal)
 
                     ve.location = tmp;
                     strcpy(ve.location, buff + strlen("LOCATION:"));
-                    removeNewLineChar(ve.location);
                 }
                 else if ( !strncmp(buff, "DESCRIPTION:", strlen("DESCRIPTION:")) )
                 {
@@ -124,13 +112,13 @@ MYERRNO ICS_load(const char* file, Calendar* cal)
 
                     ve.description = tmp;
                     strcpy(ve.description, buff + strlen("DESCRIPTION:"));
-                    removeNewLineChar(ve.description);
                 }
                 else if ( !strncmp(buff, "PRIORITY:", strlen("PRIORITY:")) )
                 {
                     myatoi(buff + strlen("PRIORITY:"), &ve.priority);
                 }
                 fgets(buff, sizeof buff, fp);
+                removeNewLineChar(buff);
                 ++currentLine;
             }
             if ( isValidVEvent(ve) )
@@ -143,6 +131,49 @@ MYERRNO ICS_load(const char* file, Calendar* cal)
     return SUCCESS;
 }
 
+MYERRNO ICS_write(const char* file, const Calendar* cal)
+{
+    assert(file != NULL && cal != NULL && isNonEmptyFile(file));
+
+    FILE* fp = fopen(file, "w");
+    if (fp == NULL)
+    {
+        return FAIL_FILE_WRITE;
+    }
+    
+    /* First, print meta things */
+    fprintf(fp, "BEGIN:VCALENDAR\n");
+    fprintf(fp, "VERSION:%s\n", ICALVERSION);
+
+    /* Traverse Calendar and print VEvents into file */
+    VEventNode* traveller = cal->first->next;
+
+    while( traveller != cal->last )
+    {
+        fprintf(fp, "BEGIN:VEVENT\n");
+        fprintf(fp, "DTSTART:%04d%02d%02dT%02d%02d00Z\n",
+                traveller->ve.start.date.year, traveller->ve.start.date.month, traveller->ve.start.date.day,
+                traveller->ve.start.time.hour, traveller->ve.start.time.minute);
+        fprintf(fp, "DTEND:%04d%02d%02dT%02d%02d00Z\n",
+                traveller->ve.end.date.year, traveller->ve.end.date.month, traveller->ve.end.date.day,
+                traveller->ve.end.time.hour, traveller->ve.end.time.minute);
+        fprintf(fp, "SUMMARY:%s\n", traveller->ve.summary);
+        fprintf(fp, "LOCATION:%s\n", traveller->ve.location);
+        fprintf(fp, "DESCRIPTION:%s\n", traveller->ve.description);
+        fprintf(fp, "PRIORITY:%d\n", traveller->ve.priority);
+        fprintf(fp, "END:VEVENT\n");
+
+        traveller = traveller->next;
+    }
+
+    /* Close VCALENDAR in file */
+    fprintf(fp, "END:VCALENDAR\n");
+
+    fclose(fp);
+
+    return SUCCESS;
+}
+   
 MYERRNO Calendar_create(Calendar* cal)
 {
     assert(cal != NULL);
@@ -176,12 +207,29 @@ MYERRNO Calendar_create(Calendar* cal)
     return SUCCESS;
 }
 
+MYERRNO Calendar_destroy(Calendar* cal)
+{
+    assert(cal != NULL);
+
+    /* Traverse Calendar and destroy all VEvents between sentinels */
+    VEventNode* traveller = cal->first->next;
+
+    while( traveller->next != cal->last )
+    {
+        assert( Calendar_deleteVEvent(cal, traveller->ve) == SUCCESS );
+        traveller = traveller->next;
+    }
+
+    /* Only sentinels remain, destroy them too */
+    free(cal->first);
+    free(cal->last);
+
+    return SUCCESS;
+}
+
 MYERRNO Calendar_addVEvent(Calendar* cal, VEvent ve)
 {
     assert(cal != NULL && isValidVEvent(ve));
-
-    // increase number of entries
-    ++cal->numberOfEntries;
 
     VEventNode* traveller = cal->first;
     /* Traverse Calendar to find last entry */
@@ -189,7 +237,7 @@ MYERRNO Calendar_addVEvent(Calendar* cal, VEvent ve)
         (
             traveller->next != cal->last && 
                 (
-                    compareDateTime(ve.start, traveller->next->ve.start) == BEFORE  ||
+                    compareDateTime(ve.start, traveller->next->ve.start) == AFTER  ||
                     compareDateTime(ve.end, traveller->next->ve.start) == SAME
                 )
         )
@@ -210,6 +258,8 @@ MYERRNO Calendar_addVEvent(Calendar* cal, VEvent ve)
     /* Move on to new entry and fill its data with ve */
     traveller = traveller->next;
     traveller->ve = ve;
+
+    ++cal->numberOfEntries;
 
     return SUCCESS;
 }
@@ -233,6 +283,7 @@ MYERRNO Calendar_deleteVEvent(Calendar* cal, VEvent ve)
     }
     
     VEvent_delete(&traveller->ve);
+    --cal->numberOfEntries;
     
     // set pointers (tear out link at deletion point)
     traveller->prev->next = traveller->next;

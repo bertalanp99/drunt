@@ -14,6 +14,8 @@ MYERRNO ICSVEventCounter(const char*, int*);
 
 int isValidICSTimeStamp(const char*);
 
+int hasNewLineChar(const char*);
+
 char* mystrncpy(char*, const char*, const int);
 
 int isValidICS(const char*);

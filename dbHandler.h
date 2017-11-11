@@ -6,9 +6,13 @@
 
 MYERRNO ICS_load(const char*, Calendar*);
 
+MYERRNO ICS_write(const char*, const Calendar*);
+
 MYERRNO VEvent_add(Calendar*, const VEvent);
 
 MYERRNO Calendar_create(Calendar*);
+
+MYERRNO Calendar_destroy(Calendar*);
 
 MYERRNO Calendar_addVEvent(Calendar*, VEvent);
 

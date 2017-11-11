@@ -15,7 +15,7 @@ void printCalendar_raw(const Calendar* cal)
         traveller = traveller->next;
     }
 
-    printf("Finished printing calendar!");
+    printf("Finished printing calendar!\n");
 }
 
 void printVEventNode_raw(const VEventNode* ven)
