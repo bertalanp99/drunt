@@ -48,14 +48,14 @@ MYERRNO ICS_load(const char* file, Calendar* cal)
     while (fgets(buff, sizeof buff, fp) != NULL)
     {
         ++currentLine;
-        if ( !strcmp(buff, "BEGIN:VEVENT") )
+        if ( !strcmp(buff, "BEGIN:VEVENT\n") || !strcmp(buff, "BEGIN:VEVENT\r\n") )
         {
             VEvent ve;
-            while ( strcmp(buff, "END:VEVENT") )
+            while ( strcmp(buff, "END:VEVENT\n") && strcmp(buff, "END:VEVENT\r\n") )
             {
                 if ( !strncmp(buff, "DTSTART:", strlen("DTSTART:")) )
                 {
-                    if ( ICSTimeStampReader(buff + strlen("DTSTART"), &ve.start) != SUCCESS )
+                    if ( ICSTimeStampReader(buff + strlen("DTSTART:"), &ve.start) != SUCCESS )
                     {
                         warning("Corrupt timestamp at %s:%d\n=>\t%s", file, currentLine, buff);
                         return FAIL_TIMESTAMP_CORRUPT;
@@ -85,6 +85,8 @@ MYERRNO ICS_load(const char* file, Calendar* cal)
                     }
 
                     ve.summary = tmp;
+                    strcpy(ve.summary, buff + strlen("SUMMARY:"));
+                    removeNewLineChar(ve.summary);
                 }
                 else if ( !strncmp(buff, "LOCATION:", strlen("LOCATION:")) )
                 {
@@ -102,6 +104,8 @@ MYERRNO ICS_load(const char* file, Calendar* cal)
                     }
 
                     ve.location = tmp;
+                    strcpy(ve.location, buff + strlen("LOCATION:"));
+                    removeNewLineChar(ve.location);
                 }
                 else if ( !strncmp(buff, "DESCRIPTION:", strlen("DESCRIPTION:")) )
                 {
@@ -119,11 +123,14 @@ MYERRNO ICS_load(const char* file, Calendar* cal)
                     }
 
                     ve.description = tmp;
+                    strcpy(ve.description, buff + strlen("DESCRIPTION:"));
+                    removeNewLineChar(ve.description);
                 }
                 else if ( !strncmp(buff, "PRIORITY:", strlen("PRIORITY:")) )
                 {
                     myatoi(buff + strlen("PRIORITY:"), &ve.priority);
                 }
+                fgets(buff, sizeof buff, fp);
                 ++currentLine;
             }
             if ( isValidVEvent(ve) )

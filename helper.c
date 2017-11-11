@@ -239,18 +239,36 @@ int isValidICSTimeStamp(const char* timestamp)
     assert(timestamp != NULL && strcmp(timestamp, ""));
    
     // temporarily myatoi() everything and also check their validity
-    char buff[4];
+    char buff[8]; // 4+1 would be enough though
     int tmp;
     return
         (
-            myatoi(strncpy(buff, timestamp, 4), &tmp)       && isValidYear(tmp)     &&
-            myatoi(strncpy(buff, timestamp + 4, 2), &tmp)   && isValidMonth(tmp)    &&
-            myatoi(strncpy(buff, timestamp + 6, 2), &tmp)   && isValidDay(tmp)      &&
-            myatoi(strncpy(buff, timestamp + 9, 2), &tmp)   && isValidHour(tmp)     &&
-            myatoi(strncpy(buff, timestamp + 11, 2), &tmp)  && isValidMinute(tmp)   &&
+            myatoi(mystrncpy(buff, timestamp, 4), &tmp)       && isValidYear(tmp)     &&
+            myatoi(mystrncpy(buff, timestamp + 4, 2), &tmp)   && isValidMonth(tmp)    &&
+            myatoi(mystrncpy(buff, timestamp + 6, 2), &tmp)   && isValidDay(tmp)      &&
+            myatoi(mystrncpy(buff, timestamp + 9, 2), &tmp)   && isValidHour(tmp)     &&
+            myatoi(mystrncpy(buff, timestamp + 11, 2), &tmp)  && isValidMinute(tmp)   &&
             // TODO deal with seconds?
-            (*(timestamp + 15) == '\0')
+            (
+                *(timestamp + 15) == '\0'                                   ||
+                *(timestamp + 15) == '\n'                                   || 
+                ( *(timestamp + 15) == '\r' && *(timestamp + 16) == '\n' )  ||
+                ( *(timestamp + 15) == 'Z' && // unly ZULU
+                    (
+                        *(timestamp + 16) == '\0' ||
+                        *(timestamp + 16) == '\n' ||
+                        ( *(timestamp + 16) == '\r' && *(timestamp + 17) == '\n' )
+                    )
+                )
+            ) // stupid DOS text files
         );
+}
+
+char* mystrncpy(char* dest, const char* src, const int len)
+{
+    strncpy(dest, src, len);
+    dest[len] = '\0';
+    return dest;
 }
 
 MYERRNO isNonEmptyFile(const char* file)
@@ -278,8 +296,6 @@ MYERRNO isNonEmptyFile(const char* file)
     fclose(fp);
 }
 
-
-
 MYERRNO ICSTimeStampReader(const char* ts, DateTime* dt)
 {
     /* Format of iCalendar timestamp: YYYYMMDDTHHMMSS
@@ -294,13 +310,13 @@ MYERRNO ICSTimeStampReader(const char* ts, DateTime* dt)
     }
 
     /* No need to check for anything, isValidICSTimeStamp() has already done that */
-    char buff[4];
+    char buff[8]; // 4+1 would be sufficient though
 
-    myatoi(strncpy(buff, ts, 4), &dt->date.year);
-    myatoi(strncpy(buff, ts + 4, 2), &dt->date.month);
-    myatoi(strncpy(buff, ts + 6, 2), &dt->date.day);
-    myatoi(strncpy(buff, ts + 9, 2), &dt->time.hour);
-    myatoi(strncpy(buff, ts + 11, 2), &dt->time.minute);
+    myatoi(mystrncpy(buff, ts, 4), &dt->date.year);
+    myatoi(mystrncpy(buff, ts + 4, 2), &dt->date.month);
+    myatoi(mystrncpy(buff, ts + 6, 2), &dt->date.day);
+    myatoi(mystrncpy(buff, ts + 9, 2), &dt->time.hour);
+    myatoi(mystrncpy(buff, ts + 11, 2), &dt->time.minute);
 
     return SUCCESS;
 }
@@ -462,7 +478,7 @@ RELATIVEDATE compareTime(const Time t1, const Time t2)
 
 void removeNewLineChar( char* str )
 {
-    assert(str != NULL && str[strlen(str) - 1] == '\n');
+    assert(str != NULL && ( str[strlen(str) - 1] == '\n' || (str[strlen(str) - 2] == '\r' && str[strlen(str) - 1] == '\n')) );
 
     str[strlen(str) - 1] = '\0';
 }

@@ -8,22 +8,11 @@
 #include <string.h>
 
 int main(int argc, char *argv[])
-{
-    FILE* fp = fopen("cal.ics", "r");
-    if (fp == NULL)
-    {
-        printf("Fuck! Could not open %s\n", "cal.ics");
-    }
-    else
-    {
-        printf("Hmm.. I seem to be able to open %s\n", "cal.ics");
-    }
-    fclose(fp);
-    
+{ 
     printf("Reading ICS...\n");
     Calendar cal;
     Calendar_create(&cal);
-    ICS_load("cal.ics", &cal);
+    ICS_load("neptun.ics", &cal);
     
     printf("Printing calendar raw below\n\n\n"); 
 
