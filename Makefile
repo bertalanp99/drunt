@@ -4,7 +4,7 @@ CFLAGS=-Wall -Wextra -std=c99 -g
 
 all: clean drunt
 
-drunt: dbHandler.o debug.o errorHandler.o helper.o
+drunt: dbHandler.o debug.o errorHandler.o helper.o interactiveHandler.o commandHandler.o
 
 clean:
 	rm -vf drunt

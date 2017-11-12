@@ -1,9 +1,11 @@
 #ifndef ARRAYS_H__
 #define ARRAYS_H__
 
+#include "enums.h"
+
 #include <stdlib.h>
 
-int monthLength[12] = {
+/*int monthLength[12] = {
     31, // January
     28, // February
     31, // March
@@ -16,24 +18,9 @@ int monthLength[12] = {
     31, // October
     30, // November
     31  // December
-};
+};*/ // TODO unused
 
-MonthName MonthNames[12] = {
-    { "January"     ,   "Jan" },
-    { "February"    ,   "Feb" },
-    { "March"       ,   "Mar" },
-    { "April"       ,   "Apr" },
-    { "May"         ,   "May" },
-    { "June"        ,   "Jun" },
-    { "July"        ,   "Jul" },
-    { "August"      ,   "Aug" },
-    { "September"   ,   "Sep" },
-    { "October"     ,   "Oct" },
-    { "November"    ,   "Nov" },
-    { "December"    ,   "Dec" }
-}; // TODO do I need this?
-
-const char* ICSTags[] = {
+/*extern char* ICSTags[] = {
     "DTSTART:",
     "DTEND:",
     "SUMMARY:",
@@ -41,6 +28,17 @@ const char* ICSTags[] = {
     "DESCRIPTION:",
     "PRIORITY:",
     NULL
+}*/ // TODO unused
+
+static char* commands[] = {
+    "help",
+    "exit",
+    "open",
+    "create",
+    "modify",
+    "delete",
+    "list"
 };
 
 #endif
+

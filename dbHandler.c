@@ -131,9 +131,27 @@ MYERRNO ICS_load(const char* file, Calendar* cal)
     return SUCCESS;
 }
 
-MYERRNO ICS_write(const char* file, const Calendar* cal)
+MYERRNO ICS_write(const char* file, const Calendar* cal, WriteMode wm)
 {
-    assert(file != NULL && cal != NULL && isNonEmptyFile(file));
+    assert(file != NULL && cal != NULL);
+
+    switch (wm)
+    {
+        case NEW:
+            switch ( isNonEmptyFile(file) )
+            {
+                case FAIL_FILE_READ:
+                    break;
+
+                default:
+                    warning("File seems to already exist but drunt was asked to create new. Ignoring...\n");
+                    return FAIL_FILE_EXISTS;
+            }
+            break;
+
+        case OVERWRITE:
+            break;
+    }             
 
     FILE* fp = fopen(file, "w");
     if (fp == NULL)
@@ -214,7 +232,7 @@ MYERRNO Calendar_destroy(Calendar* cal)
     /* Traverse Calendar and destroy all VEvents between sentinels */
     VEventNode* traveller = cal->first->next;
 
-    while( traveller->next != cal->last )
+    while( traveller != cal->last )
     {
         assert( Calendar_deleteVEvent(cal, traveller->ve) == SUCCESS );
         traveller = traveller->next;

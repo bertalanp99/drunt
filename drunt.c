@@ -3,13 +3,14 @@
 #include "debug.h"
 #include "errorHandler.h"
 #include "helper.h"
+#include "interactiveHandler.h"
 
 #include <stdlib.h>
 #include <string.h>
 
 int main(int argc, char *argv[])
 { 
-    char* source = "cal.ics";
+    /*char* source = "cal.ics";
     printf("Reading %s...\n", source);
     Calendar cal;
     Calendar_create(&cal);
@@ -92,5 +93,8 @@ int main(int argc, char *argv[])
     printf("Everything done. Bye!\n");
 
     return 0;
+    */
+
+    shell();
 }
 

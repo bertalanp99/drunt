@@ -1,6 +1,5 @@
 #include "helper.h"
 #include "errorHandler.h"
-#include "arrays.h"
 #include "enums.h"
 
 #include <stdio.h>
@@ -26,11 +25,11 @@ int isLeapYear(const int year)
     return ( (year % 4 == 0) && (year % 100 != 0) && (year % 400 == 0) );
 }
 
-int hasICSTag(const char* str, const char* tag)
+/*int hasICSTag(const char* str, const char* tag)
 {
     assert(str != NULL && tag != NULL);
     return !strncmp(str, tag, strlen(tag));
-}
+}*/ // TODO unused
 
 MYERRNO ICSVEventCounter(const char* file, int* n)
 {
@@ -397,7 +396,7 @@ RELATIVEDATE compareDateTime(const DateTime dt1, const DateTime dt2)
 {
     if ( !isValidDateTime(dt1) || !isValidDateTime(dt2) )
     {
-        return ERROR;
+        return RELATIVEDATE_ERROR;
     }
     
     if (compareDate(dt1.date, dt2.date) == BEFORE)
@@ -429,7 +428,7 @@ RELATIVEDATE compareDate(const Date d1, const Date d2)
 {
    if (!isValidDate(d1) || !isValidDate(d2))
    {
-       return ERROR;
+       return RELATIVEDATE_ERROR;
    }
 
    if (d1.year < d2.year)
@@ -472,7 +471,7 @@ RELATIVEDATE compareTime(const Time t1, const Time t2)
 {
     if (!isValidTime(t1) || !isValidTime(t2))
     {
-        return ERROR;
+        return RELATIVEDATE_ERROR;
     }
 
     if (t1.hour < t2.hour)
@@ -541,26 +540,26 @@ int myatoi(const char* str, int* out) // TODO CREDIT THIS FUNCTION TO "https://s
     return 1;
 }
 
-void icsTagRemover(char* original, char* new)
-{
-    assert
-        (   
-            original != NULL      && new != NULL        &&
-            !strcmp(original, "") && !strcmp(new, "")
-        );
-
-    /* Look for iCalendar tag in input string */
-    for (int i = 0; ICSTags[i] != NULL; ++i)
-    {
-        if ( !strncmp(original, ICSTags[i], strlen(ICSTags[i])) )
-        {
-            new = (original + strlen(ICSTags[i])); // found tag --> store it in new and return
-            return;
-        }
-    }
-    
-    new = NULL; // could not find tag, return NULL to indicate
-}
+//void icsTagRemover(char* original, char* new)
+//{
+//    assert
+//        (   
+//            original != NULL      && new != NULL        &&
+//            !strcmp(original, "") && !strcmp(new, "")
+//        );
+//
+//    /* Look for iCalendar tag in input string */
+//    for (int i = 0; ICSTags[i] != NULL; ++i)
+//    {
+//        if ( !strncmp(original, ICSTags[i], strlen(ICSTags[i])) )
+//        {
+//            new = (original + strlen(ICSTags[i])); // found tag --> store it in new and return
+//            return;
+//        }
+//    }
+//    
+//    new = NULL; // could not find tag, return NULL to indicate
+//} // TODO unused
     
 int promptYN(char* message, ...)
 {
@@ -583,8 +582,7 @@ int promptYN(char* message, ...)
         printf("%s [y/n] ", buff);
     }
 
-    char response;
-    scanf(" %c", &response);
+    char response = getchar();
     switch (response)
     {
         case 'y':
@@ -596,7 +594,7 @@ int promptYN(char* message, ...)
             break;
 
         default:
-            printf("Invalid choice: %c", response);
+            printf("Invalid choice: %c\n", response);
             return 0;
     }
 }

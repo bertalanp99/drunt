@@ -51,6 +51,7 @@ typedef enum {
     FAIL_FILE_WRITE,
     FAIL_FILE_EMPTY,
     FAIL_FILE_CORRUPT,
+    FAIL_FILE_EXISTS,
     FAIL_ICS_NOEND,
     FAIL_MALLOC,
     FAIL_REALLOC,
@@ -62,9 +63,24 @@ typedef enum {
 } MYERRNO;
 
 typedef enum {
+    NEW,
+    OVERWRITE
+} WriteMode;
+
+typedef enum {
+    NEUTRAL,
+    WARNING,
+    PROMPT,
+    STATUS,
+    PROGRESS,
+    DONE,
+    ERROR
+} ShellSays;
+
+typedef enum {
     BEFORE,
     SAME,
     AFTER,
-    ERROR
+    RELATIVEDATE_ERROR
 } RELATIVEDATE;
 #endif
