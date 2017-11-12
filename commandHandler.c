@@ -100,6 +100,7 @@ int command_exit(char** args)
 {   
     if ( !args[1] )
     {
+        shell_say(PROGRESS, "Saving you calendar into file '%s'...", file);
         if (file)
         {
             switch( ICS_write(file, &calendar, OVERWRITE) )
@@ -111,6 +112,7 @@ int command_exit(char** args)
                 default:
                     break;
             }
+            shell_say(DONE, "Successfully saved calendar! Farewell (• ε •)");
             return 0;
         }
         else // filename is NULL
@@ -145,8 +147,17 @@ int command_exit(char** args)
     }
     else if ( !strcmp(args[1], "--discard") || !strcmp(args[1], "-d") )
     {
-        Calendar_destroy(&calendar);
-        return 0;
+        shell_say(WARNING, "About to exit drunt without saving changes! Are you sure?");
+        if (!promptYN("[ ?? ] Exit?"))
+        {
+            shell_say(STATUS, "Cancelled exit");
+            return 1;
+        }
+        else
+        {
+            shell_say(PROGRESS, "Exiting drunt and ditching changes...");
+            return 0;
+        }
     }
     else
     {
@@ -169,6 +180,37 @@ int command_open(char** args)
             shell_say(ERROR, "Path is too long. Can't open that. You could try moving your file somewhere else");
             return 1;
         }
+
+        if ( file )
+        {
+            shell_say(PROGRESS, "Saving currently open iCalendar '%s' to disk...", file);
+            switch ( ICS_write(file, &calendar, OVERWRITE) )
+            {
+                case FAIL_FILE_WRITE:
+                {
+                    shell_say(ERROR, "Failed to save file!");
+                    if ( !promptYN("[ ?? ] Close without saving?") )
+                    {
+                        shell_say(STATUS, "Cancelled closing file and opening new");
+                        return 1;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+
+                default:
+                {
+                    shell_say(STATUS, "Successfully saved open calendar to file '%s'. Moving on to opening other file", file);
+                    break;
+                }
+            }
+        }
+
+        // reinit calendar
+        Calendar_destroy(&calendar);
+        Calendar_create(&calendar);
 
         shell_say(PROGRESS, "Loading iCalendar file %s into RAM...", buff);
 
@@ -203,11 +245,50 @@ int command_open(char** args)
                 break;
         }
 
+        char* tmp = realloc(file, sizeof(char) * (strlen(buff) + 1) );
+        if (!tmp)
+        {
+            shell_say(ERROR, "Failed to allocate memory for new filename! This can lead to all sorts of errors. It is STROGLY advised to exit and try again");
+            return 1;
+        }
+        file = tmp;
+        strcpy(file, buff);
         shell_say(DONE, "File %s has been successfully loaded!", buff);
         return 1;
     }
     else if ( args[1] && !args[2] )
     {
+        if ( file )
+        {
+            shell_say(PROGRESS, "Saving currently open iCalendar '%s' to disk...", file);
+            switch ( ICS_write(file, &calendar, OVERWRITE) )
+            {
+                case FAIL_FILE_WRITE:
+                {
+                    shell_say(ERROR, "Failed to save file!");
+                    if ( !promptYN("[ ?? ] Close without saving?") )
+                    {
+                        shell_say(STATUS, "Cancelled closing file and opening new");
+                        return 1;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+
+                default:
+                {
+                    shell_say(STATUS, "Successfully saved open calendar to file '%s'. Moving on to opening other file", file);
+                    break;
+                }
+            }
+        }
+
+        // reinit calendar
+        Calendar_destroy(&calendar);
+        Calendar_create(&calendar);
+        
         shell_say(PROGRESS, "Loading iCalendar file %s into RAM...", args[1]);
 
         switch( ICS_load(args[1], &calendar) )
@@ -241,6 +322,15 @@ int command_open(char** args)
                 break;
         }
 
+        char* tmp = realloc(file, sizeof(char) * (strlen(args[1]) + 1) );
+        if (!tmp)
+        {
+            shell_say(ERROR, "Failed to allocate memory for new filename! This can lead to all sorts of errors. It is STROGLY advised to exit and try again");
+            return 1;
+        }
+        file = tmp;
+        strcpy(file, args[1]);
+        
         shell_say(DONE, "File %s has been successfully loaded!", args[1]);
         return 1;
     }
@@ -263,20 +353,21 @@ int command_create(char** args)
         }
     }
     
+    VEvent ve = {
+        .start = {
+            .date = { .year = 0, .month = 0, .day = 0 },
+            .time = { .hour = 0, .minute = 0 } },
+        .end = {
+            .date = { .year = 0, .month = 0, .day = 0 },
+            .time = { .hour = 0, .minute = 0 } },
+        .summary = NULL,
+        .location = NULL,
+        .description = NULL,
+        .priority = 10
+    };
+    
     if (!args[1])
     {
-        VEvent ve = {
-            .start = {
-                .date = { .year = 0, .month = 0, .day = 0 },
-                .time = { .hour = 0, .minute = 0 } },
-            .end = {
-                .date = { .year = 0, .month = 0, .day = 0 },
-                .time = { .hour = 0, .minute = 0 } },
-            .summary = NULL,
-            .location = NULL,
-            .description = NULL,
-            .priority = 10
-        };
         char buff[BUFFSIZE];
         
         shell_say(NEUTRAL, "STARTING date format: YYYY MM DD HH MM\t(ex gr '2017 11 12 11 00' for 2017/11/12 11.00");
@@ -415,6 +506,7 @@ int command_create(char** args)
         shell_say(NEUTRAL, "Event priority values range from 0 to 9. '0' means most important & '9' means least important");
         shell_say(PROMPT, "Event priority:");
         fgets(buff, sizeof buff, stdin);
+        getchar();
         sscanf(buff, "%d", &ve.priority);
         // TODO is valid
         
@@ -436,7 +528,161 @@ int command_create(char** args)
     }
     else
     {
-        // TODO
+        int DTSTARTFlag = 0;
+        int DTENDFlag = 0;
+        int summaryFlag = 0;
+        int locationFlag = 0;
+        int descriptionFlag = 0;
+        int priorityFlag = 0;
+
+        char* options[] = {
+            "--begin", "-b",
+            "--end", "-e",
+            "--summary", "-s",
+            "--location", "-l",
+            "--descriptions", "-d",
+            "--priority", "-p"
+        };
+
+        for (int i = 1; args[i] != NULL; ++i)
+        {
+            for (int j = 0; j < ( sizeof options / sizeof(char*) ); j += 2)
+            {
+                if ( !strcmp(args[i], options[j]) || !strcmp(args[i], options[j+1]) )
+                { // TODO improve !!!
+                    if (j == 0)
+                    {
+                        if ( !args[i + 1] )
+                        {
+                            shell_say(ERROR, "Option --begin / -b missing argument (timestamp)");
+                            return 1;
+                        }
+                        else
+                        {
+                            if ( !isValidICSTimeStamp(args[i + 1]) )
+                            {
+                                shell_say(ERROR, "Option --begin / -b received invalid timestamp! Check 'help create' for details!");
+                                return 1;
+                            }
+                            else
+                            {
+                                ICSTimeStampReader(args[i + 1], &ve.start);
+                                DTSTARTFlag = 1;
+                            }
+                        }
+                    }
+                    else if (j == 2)
+                    {
+                        if ( !args[i + 1] )
+                        {
+                            shell_say(ERROR, "Option --end / -e missing argument (timestamp)");
+                            return 1;
+                        }
+                        else
+                        {
+                            if ( !isValidICSTimeStamp(args[i + 1]) )
+                            {
+                                shell_say(ERROR, "Option --end / -e received invalid timestamp! Check 'help create' for details!");
+                                return 1;
+                            }
+                            else
+                            {
+                                ICSTimeStampReader(args[i + 1], &ve.end);
+                                DTENDFlag = 1;
+                            }
+                        }
+                    }
+                    else if (j == 4)
+                    {
+                        if ( !args[i + 1] )
+                        {
+                            shell_say(ERROR, "Option --summary / -s missing argument (text)");
+                            return 1;
+                        }
+                        else
+                        {
+                            ve.summary = malloc( sizeof(char) * (strlen(args[i + 1]) + 1) );
+                            if (!ve.summary)
+                            {
+                                shell_say(ERROR, "Failed to allocate memory for summary field!");
+                                return 1;
+                            }
+                            strcpy(ve.summary, args[i+1]);
+                            summaryFlag = 1;
+                        }
+                    }
+                    else if (j == 6)
+                    {
+                        if ( !args[i + 1] )
+                        {
+                            shell_say(ERROR, "Option --location / -l missing argument (text)");
+                            return 1;
+                        }
+                        else
+                        {
+                            ve.location = malloc( sizeof(char) * (strlen(args[i + 1]) + 1) );
+                            if (!ve.location)
+                            {
+                                shell_say(ERROR, "Failed to allocate memory for location field!");
+                                return 1;
+                            }
+                            strcpy(ve.location, args[i+1]);
+                            locationFlag = 1;
+                        }
+                    }
+                    else if (j == 8)
+                    {
+                        if ( !args[i + 1] )
+                        {
+                            shell_say(ERROR, "Option --description / -d missing argument (text)");
+                            return 1;
+                        }
+                        else
+                        {
+                            ve.description = malloc( sizeof(char) * (strlen(args[i + 1]) + 1) );
+                            if (!ve.description)
+                            {
+                                shell_say(ERROR, "Failed to allocate memory for description field!");
+                                return 1;
+                            }
+                            strcpy(ve.description, args[i+1]);
+                            descriptionFlag = 1;
+                        }
+                    }
+                    else if (j == 10)
+                    {
+                        if ( !args[i + 1] )
+                        {
+                            shell_say(ERROR, "Option --priority / -p missing argument (number 0-9)"); // TODO VALID
+                            return 1;
+                        }
+                        else
+                        {
+                            if ( !myatoi(args[i + 1], &ve.priority) )
+                            {
+                                shell_say(ERROR, "Failed to interpret priority value entered!");
+                                return 1;
+                            }
+                            else
+                            {
+                                priorityFlag = 1;
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    shell_say(ERROR, "Invalid option '%s'!", args[i]);
+                    return 1;
+                }
+            }
+        }
+
+        if (!DTSTARTFlag)
+        {
+            // TODO READER
+        }
+
         return 1;
     }
     return 1;

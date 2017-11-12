@@ -7,8 +7,7 @@
 void shell(void)
 {
     /* Initialise empty calendar */
-    Calendar* cal = &calendar;
-    Calendar_create(cal);
+    Calendar_create(&calendar);
 
     /* Set default file */
     char* tmps = malloc( sizeof(char) * (strlen(DEFAULTFILE) + 1) );
@@ -19,28 +18,59 @@ void shell(void)
     strcpy(tmps, DEFAULTFILE);
     file = tmps;
     
+    /* Startup actions */
+    shell_say(PROGRESS, "Loading default iCalendar (%s)...", DEFAULTFILE);
+    switch (ICS_load(DEFAULTFILE, &calendar))
+    {
+        case FAIL_FILE_CORRUPT:
+            shell_say(WARNING, "Failed to load default iCalendar %s; file is either corrupt or does not exist", DEFAULTFILE);
+            break;
+
+        case FAIL_FILE_READ:
+            shell_say(WARNING, "Failed to open default iCalendar %s; unable to open file for reading (it proably does not exist)", DEFAULTFILE);
+            break;
+
+        case FAIL_TIMESTAMP_CORRUPT:
+            shell_say(ERROR, "Default iCalendar file %s contains corrupt timestamp. File has not been loaded", DEFAULTFILE);
+            break;
+
+        case FAIL_MALLOC:
+            shell_say(ERROR, "Unable to allocate memory for default iCalendar. File has not been loaded.", DEFAULTFILE);
+            break;
+
+        case FAIL_OVERFLOW:
+            shell_say(ERROR, "Default iCalendar file %s contains overflow. File has not been loaded", DEFAULTFILE);
+            break;
+
+        default:
+            shell_say(DONE, "Successfully loaded default iCalendar (%s)!", DEFAULTFILE);
+            break;
+    }
+
+    putchar('\n');
+    shell_say(STATUS, "Welcome to drunt! Please enter 'help' if you are new around here ^( '‿' )^");
+    
+    /* Shell handling */
     char* line;
     char** args;
     int status;
-
-    shell_say(STATUS, "Welcome to drunt! Please enter 'help' if you are new around here :-)");
     
     do
     {
-        printf("\n> ");
+        printf("\n[ -> ] ");
         
-        /* Basic cycle is read --> interpret --> execute --> repeat */
+        // basic cycle: read --> interpret --> execute --> repeat
         line = shell_readline();
         args = shell_splitline(line);
         status = shell_execute(args);
 
-        /* Freeing dynamic arrays every time */
+        // freeing dynamic arrays every time
         free(line);
         free(args);
     }
     while (status);
 
-    Calendar_destroy(cal);
+    Calendar_destroy(&calendar);
 }
 
 char* shell_readline(void)
@@ -48,7 +78,7 @@ char* shell_readline(void)
     char buff[BUFFSIZE];
     
     do
-    {
+    { // keep reading until valid line is read
         fgets(buff, sizeof buff, stdin);
         if (strlen(buff) >= MAX_COMMANDLENGTH)
         {
@@ -81,13 +111,7 @@ char** shell_splitline(char* line)
         return NULL;
     }
 
-    /* Allocate memory for one token */
-    char* token = malloc( sizeof(char) * TOKEN_BUFFSIZE );
-    if (!token)
-    {
-        shell_say(ERROR, "Failed to allocate memory for command arguments!");
-        return NULL;
-    }
+    char* token;
 
     /* Use strtok() to cut command into chunks */
     int i = 0;
@@ -106,6 +130,7 @@ char** shell_splitline(char* line)
 
     /* Indicate end of argument array with a NULL */
     tokens[i] = NULL;
+
     return tokens;
 }
 
@@ -142,7 +167,7 @@ void shell_say(ShellSays ss, const char* message, ...)
     /* Output */
     if (rc == -1)
     {
-        printf("[shell_say has failed to format message --> unformatted message follows\n%s\n", message);
+        printf("[ xx ] drunt has failed to format message --> unformatted message follows\n\t%s\n", message);
     }
     else
     {

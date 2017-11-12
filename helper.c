@@ -14,6 +14,7 @@
 #define YEAR_MAX 2050
 
 #define BUFFSIZE 1024
+#define MAX_LINELENGTH 600 // 75 octets
 
 int isLeapYear(const int year)
 {
@@ -85,16 +86,18 @@ int isValidICS(const char* file)
 
     char buff[BUFFSIZE];
     int currentLine = -1;
+ 
+    ICSTag tags[] = {
+        { .tag = "DTSTART:",        .type = TIMESTAMP,  .flag = 0 },
+        { .tag = "DTEND:",          .type = TIMESTAMP,  .flag = 0 },
+        { .tag = "SUMMARY:",        .type = STRING,     .flag = 0 },
+        { .tag = "LOCATION:",       .type = STRING,     .flag = 0 },
+        { .tag = "DESCRIPTION:",    .type = STRING,     .flag = 0 },
+        { .tag = "PRIORITY:",       .type = NUMBER,     .flag = 0 }
+    };
 
     int endCalendarFlag = 0;
     int beginVEventFlag = 0;
-
-    int DTSTARTFlag = 0;
-    int DTENDFlag = 0;
-    int summaryFlag = 0;
-    int locationFlag = 0;
-    int descriptionFlag = 0;
-    int priorityFlag = 0;
 
     // check first line first
     fgets(buff, sizeof buff, fp);
@@ -112,20 +115,20 @@ int isValidICS(const char* file)
         removeNewLineChar(buff);
         if (endCalendarFlag)
         {
-            warning("Content found after END:VCALENDAR at %s:%d\n[ => ]\t%s", file, currentLine, buff);
-            return 0; // content found after END:VCALENDAR
+            warning("Content found after END:VCALENDAR at %s:%d\n[ x> ]\t%s", file, currentLine, buff);
+            return 0;
         }
         else if ( !strcmp(buff, "BEGIN:VCALENDAR") )
         {
-            warning("Nested VCALENDAR at %s:%d\n[ => ]\t%s", file, currentLine, buff);
-            return 0; // nested VCALENDARs are illegal
+            warning("Nested VCALENDAR at %s:%d\n[ x> ]\t%s", file, currentLine, buff);
+            return 0;
         }
         else if ( !strcmp(buff, "END:VCALENDAR") )
         {
             if (beginVEventFlag)
             {
-                warning("%s has END:VCALENDAR while there's still an open VEVENT at line %d\n[ => ]\t%s", file, currentLine, buff);
-                return 0; // calendar ends without closing an open VEVENT
+                warning("BEGIN:VCALENDAR closed by END:VCALENDAR at %s:%d\n[ x> ]\t%s", file, currentLine, buff);
+                return 0;
             }
             else
             {
@@ -136,8 +139,8 @@ int isValidICS(const char* file)
         {   
             if (beginVEventFlag)
             {
-                warning("Nested VEVENT at %s:%d\n[ => ]\t%s", file, currentLine, buff);
-                return 0; // nested VEVENTs are illegal
+                warning("Nested VEVENT at %s:%d\n[ x> ]\t%s", file, currentLine, buff);
+                return 0;
             }
             else
             {
@@ -148,107 +151,112 @@ int isValidICS(const char* file)
         {
             if (!beginVEventFlag)
             {
-                warning("Found END:VEVENT tag without preceding BEGIN:VEVENT at %s:%d\n[ => ]\t%s", file, currentLine, buff);
-                return 0; // END:VEVENT without preceding BEGIN:VEVENT is illegal
+                warning("END:VEVENT found without preceding BEGIN:VEVENT at %s:%d\n[ x> ]\t%s", file, currentLine, buff);
+                return 0;
             }
             else
             {
-                if (DTSTARTFlag && DTENDFlag && summaryFlag && locationFlag && descriptionFlag && priorityFlag)
+                int hasAllRequiredTags = 1;
+                for (int i = 0; i < (int) ( sizeof tags / sizeof(ICSTag) ); ++i)
+                {
+                    if ( !tags[i].flag )
+                    {
+                        hasAllRequiredTags = 0;
+                        break;
+                    }
+                }
+                
+                if (hasAllRequiredTags)
                 {
                     beginVEventFlag = 0;
-                    DTSTARTFlag = 0;
-                    DTENDFlag = 0;
-                    summaryFlag = 0;
-                    locationFlag = 0;
-                    descriptionFlag = 0;
-                    priorityFlag = 0;
+                    for (int i = 0; i < (int) ( sizeof tags / sizeof(ICSTag) ); ++i)
+                    {
+                        tags[i].flag = 0;
+                    }
                 }
                 else
                 {
-                    warning("%s has event block that misses required details at line %d\n[ => ]\t%s", file, currentLine, buff);
-                    return 0; // VEVENT block missing required details
+                    warning("END:VEVENT found without required VEVENT detauls preceding at %d\n[ x> ]\t%s", file, currentLine, buff);
+                    return 0;
                 }
             }
         }
-        else if ( !strncmp(buff, "DTSTART:", strlen("DTSTART:")) )
+        else
         {
-            if (!beginVEventFlag)
+            for (int i = 0; i < (int) ( sizeof tags / sizeof(ICSTag) ); ++i)
             {
-                warning("Found DTSTART outside VEVENT block at %s:%d\n[ => ]\t%s", file, currentLine, buff);
-                return 0; // DTSTART outside VEVENT
+                if ( !strncmp(buff, tags[i].tag, strlen(tags[i].tag)) )
+                {
+                    if ( !beginVEventFlag )
+                    {
+                        warning("Found '%s' outside VEVENT block at %s:%d\n[ x> ]\t%s", file, currentLine, buff);
+                        return 0;
+                    }
+                    else
+                    {
+                        switch (tags[i].type)
+                        {
+                            case TIMESTAMP:
+                            {
+                                if ( !isValidICSTimeStamp(buff + strlen(tags[i].tag)) )
+                                {
+                                    warning("Found invalid timestamp at %s:%d\n[ x> ]\t%s", file, currentLine, buff);
+                                    return 0;
+                                }
+                                else
+                                {
+                                    tags[i].flag = 1;
+                                }
+                                break;
+                            }
+
+                            case STRING:
+                            {
+                                if ( strlen(buff) > MAX_LINELENGTH )
+                                {
+                                    warning("Summary exceeds iCalendar limit (75 octets) at %s:%d", file, currentLine);
+                                    return 0;
+                                }
+                                else
+                                {
+                                    tags[i].flag = 1;
+                                }
+                                break;
+                            }
+
+                            case NUMBER: // TODO drunt only processes priority as NUMER
+                            {
+                                int n;
+                                if ( !myatoi(buff + strlen(tags[i].tag), &n) )
+                                {
+                                    warning("Failed to convert priority to integer at %s:%d\n[ x> ]\t%s", file, currentLine, buff);
+                                    return 0;
+                                }
+                                else
+                                {
+                                    if ( !isValidPriority(n) )
+                                    {
+                                        warning("Invalid priority at %s:%d\n[ x> ]\t%s", file, currentLine, buff);
+                                        return 0;
+                                    }
+                                    else
+                                    {
+                                        tags[i].flag = 1;
+                                    }
+                                }
+                                break;
+                            }
+                        }       
+                    }
+                }
             }
-            else
-            {
-                DTSTARTFlag = isValidICSTimeStamp(buff + strlen("DTSTART:"));
-            }
-        }
-        else if ( !strncmp(buff, "DTEND:", strlen("DTEND:")) )
-        {
-            if (!beginVEventFlag)
-            {
-                warning("Found DTEND outside VEVENT block at %s:%d\n[ => ]\t%s", file, currentLine, buff);
-                return 0; // DTEND oustide VEVENT
-            }
-            else
-            {
-                DTENDFlag = isValidICSTimeStamp(buff + strlen("DTEND:"));
-            }
-        }
-        else if ( !strncmp(buff, "SUMMARY:", strlen("SUMMARY:")) )
-        {
-            if (!beginVEventFlag)
-            {
-                warning("Found SUMMARY outside VEVENT block at %s:%d\n[ => ]\t%s", file, currentLine, buff);
-                return 0; // SUMMARY outside VEVENT
-            }
-            else
-            {
-                summaryFlag = 1;
-            }
-        }
-        else if ( !strncmp(buff, "LOCATION:", strlen("SUMMARY:")) )
-        {
-            if (!beginVEventFlag)
-            {
-                warning("Found LOCATION outside VEVENT block at %s:%d\n[ => ]\t%s", file, currentLine, buff);
-                return 0; // LOCATION outside VEVENT
-            }
-            else
-            {
-                locationFlag = 1;
-            }
-        }
-        else if ( !strncmp(buff, "DESCRIPTION:", strlen("DESCRIPTION:")) )
-        {
-            if (!beginVEventFlag)
-            {
-                warning("Found DESCRIPTION outside VEVENT block at %s:%d\n[ => ]\t%s", file, currentLine, buff);
-                return 0; // DESCRIPTION outside VEVENT
-            }
-            else
-            {
-                descriptionFlag = 1;
-            }
-        }
-        else if ( !strncmp(buff, "PRIORITY:", strlen("PRIORITY:")) )
-        {
-            if (!beginVEventFlag)
-            {
-                warning("Found PRIORTY outside VEVENT block at %s:%d\n[ => ]\t%s", file, currentLine, buff);
-                return 0; // PRIORITY outside VEVENT
-            }
-            else
-            {
-                priorityFlag = 1;
-            }
-        }
-        // TODO check for other tags
+        }    
     }
 
-    if (!endCalendarFlag)
+    if ( !endCalendarFlag )
     {
-        warning("%s has no END:VCALENDAR! Last read line was:\n[ => ]\t%s", file, buff);
-        return 0; // calendar has not been closed
+        warning("No END:VCALENDAR found in '%s'! Last line read:\n[ x> ]\t%s", file, buff);
+        return 0;
     }
     else
     {
@@ -256,6 +264,11 @@ int isValidICS(const char* file)
     }
 
     fclose(fp);
+}
+
+int isValidPriority(int p)
+{
+    return (p >= 0 && p < 10);
 }
 
 int isValidICSTimeStamp(const char* timestamp)
@@ -274,7 +287,7 @@ int isValidICSTimeStamp(const char* timestamp)
             myatoi(mystrncpy(buff, timestamp + 9, 2), &tmp)   && isValidHour(tmp)     &&
             myatoi(mystrncpy(buff, timestamp + 11, 2), &tmp)  && isValidMinute(tmp)   &&
             // TODO deal with seconds?
-            timestamp[15] == 'Z' // only ZULU timestamps supported as of yet
+            timestamp[15] == 'Z' // TODO only ZULU timestamps supported as of yet
         );
 }
 

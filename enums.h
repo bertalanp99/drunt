@@ -83,4 +83,11 @@ typedef enum {
     AFTER,
     RELATIVEDATE_ERROR
 } RELATIVEDATE;
+
+typedef enum {
+    NUMBER,
+    STRING,
+    TIMESTAMP
+} ICSDATATYPE;
+
 #endif

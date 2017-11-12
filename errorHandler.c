@@ -27,7 +27,7 @@ void die(const char* message, ...)
     }
     else
     {
-        printf("ERROR: %s\n", buff);
+        printf("[ xx ] ERROR: %s\n", buff);
     }
 
     exit(1);
@@ -49,6 +49,6 @@ void warning(const char* message, ...)
     }
     else
     {
-        printf("WARNING: %s\n", buff);
+        printf("[ !! ] WARNING: %s\n", buff);
     }
 }

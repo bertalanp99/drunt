@@ -1,0 +1,110 @@
+\documentclass[a4paper]{article}
+
+%%%%%%%%%%%%%%%%
+%%% PACKAGES %%%
+%%%%%%%%%%%%%%%%
+
+% language
+\usepackage{polyglossia}
+
+% header and footer
+\usepackage{fancyhdr}
+
+% strikethrough text
+\usepackage{ulem}
+
+% references
+\usepackage{hyperref}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+%%% PACKAGE CONFIGS %%%
+%%%%%%%%%%%%%%%%%%%%%%%
+
+% polyglossia - set language to Hungarian
+\setdefaultlanguage{magyar}
+
+% fancyhdr - setup
+\fancyhead[L]{prog1 NHF specifikáció}
+\fancyhead[C]{QO7CU6}
+\fancyhead[R]{Péter Bertalan Zoltán}
+\fancyfoot[L]{\today}
+
+% fancyhdr - pagestyle
+\pagestyle{fancy}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% TITLE-AUTHOR-DATE %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\title{Programozás Alapjai 1 \\ NHF programozói dokumentáció}
+\author{Péter Bertalan Zoltán}
+\date{\today}
+
+\begin{document}
+	\begin{titlepage}
+		\maketitle
+		\vspace{4cm}
+		\begin{center}
+			\Huge
+			\texttt{drunt}
+		\end{center}
+	\end{titlepage}
+
+\section{Státusz}
+
+A drunt jelenleg is alapos fejlesztés alatt áll, bár korlátozott funkcionalitással már most működik. Hiányoznak viszont nagyon fontos elemek is, mint például az események közti keresés, vagy az események (vagy akármi) kilistázása. A grafikus felület még egyáltalán nem létezik, nyomaiban sem.
+
+A fejlesztési folyamat lassúsága nagyjából annak tudható be, hogy mindig szem előtt lévő szempont a kód hibatűrősége: ettől néha kevésbé átlátható lehet a kód, hosszabb is lesz valamivel, de cserébe robusztusabb a program.
+
+\subsection{Ami működik}
+\begin{itemize}
+	\item ,,interaktív'' mód korlátozott funckionalitással; működő parancsok
+	\begin{itemize}
+		\item \texttt{help [command]} (segítség)
+		\item \texttt{exit [options]} (kilépés)
+		\item \texttt{open [options]} (\texttt{.ics} fájl betöltése)
+		\item \texttt{create \sout{[options]}} (új esemény létrehozása a memóriában)
+	\end{itemize}
+	\item be lehet tölteni fájlokat a memóriába
+	\item új fájlokat lehet létrehozni
+	\item a memóriában létező naptár fájlba írható
+	\item egyszerű események elkészíthetők a memóriában, illetve ezeket kilépés alkalmával bele is lehet írni az eredetileg megnyitott fájlba, ezzel frissítve azt
+	\item több más függvény, amik a későbbi funkciók implementálása során kerülnek majd igénybevételre
+\end{itemize}
+
+\subsection{Ami nem működik \textit{még}}
+\begin{itemize}
+	\item grafikus mód
+	\item egyszeri futtatások (a drunt indítása mindössze egy parancs futtatásának erejéig, amit argumentumként adunk át)
+	\item listázás
+	\item keresés bármilyen formája
+	\item események létrehozása egy paranccsal, argumentumokkal (jelenleg csak egy ,,új esemény varázsló'' használható)
+	\item személyre szabás, konfiguráció (például alapértelmezetten megnyitott naptárfájl)
+	\item események törlése (oka: az események a keresés funkció hiányában nem azonosíthatók)
+\end{itemize}
+
+\pagebreak
+
+\section{Fájlstruktúra}
+
+A kész programfájl sok-sok egyéb fájlból fordul le. \sout{Az alábbi ,,fa'' ábra illusztrálja a fájl hierarchiát.}
+
+\subsection{\texttt{drunt.c}}
+
+A fő \texttt{.c} fájl. Egyedüli feladata, hogy eldöntse, mi történjen indításkor. Ezt úgy végzi, hogy megnézi a kapott argumentumokat.
+
+\subsection{\texttt{dbHandler.c}}
+
+Adatbázis-kezelő függvények foglalnak itt helyet. Jóllehet, ezek a függvények végzik a legpiszkosabb és talán legfontosabb feladatokat. Függvények:
+
+\subsubsection{\texttt{MYERRNO ICS\_load(const char* file, Calendar* cal)}}
+
+Azért felelős, hogy a \texttt{.ics} fájlokat beolvassa a memóriába, egy \texttt{Calendar} struktúrába, aminek a címe kerül átadásra, argumentumként.
+
+A függvény először ellenőrzi a kapott fájlt (értsd: a fájl elérési útja alapján megpróbálja megnyitni a fájlt és ha sikerül, ellenőrzi (egészen pontosan először egy másik függvény kísérli meg a megnyitást, az, amelyik az ellenőrzést is végzi. Ez a függvény egy másik fájlban foglal helyet))
+
+{ \centering \Huge Így fog kinézni a dokumentáció további része, eddig itt tartok }
+
+
+	
+\end{document}

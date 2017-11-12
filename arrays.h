@@ -41,4 +41,3 @@ static char* commands[] = {
 };
 
 #endif
-

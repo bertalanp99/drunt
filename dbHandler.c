@@ -33,6 +33,17 @@ MYERRNO ICS_load(const char* file, Calendar* cal)
 
     char buff[BUFFSIZE];
     int currentLine = 0;
+    
+    ICSTag tags[] = {
+        { .tag = "DTSTART:",        .type = TIMESTAMP,  .flag = 0 },
+        { .tag = "DTEND:",          .type = TIMESTAMP,  .flag = 0 },
+        { .tag = "SUMMARY:",        .type = STRING,     .flag = 0 },
+        { .tag = "LOCATION:",       .type = STRING,     .flag = 0 },
+        { .tag = "DESCRIPTION:",    .type = STRING,     .flag = 0 },
+        { .tag = "PRIORITY:",       .type = NUMBER,     .flag = 0 }
+    };
+
+    size_t numberOfTags = ( sizeof tags / sizeof(ICSTag) );
 
     while (fgets(buff, sizeof buff, fp) != NULL)
     {
@@ -43,90 +54,82 @@ MYERRNO ICS_load(const char* file, Calendar* cal)
             VEvent ve;
             while ( strcmp(buff, "END:VEVENT") )
             {
-                if ( !strncmp(buff, "DTSTART:", strlen("DTSTART:")) )
+                for (int i = 0; i < numberOfTags; ++i)
                 {
-                    if ( ICSTimeStampReader(buff + strlen("DTSTART:"), &ve.start) != SUCCESS )
+                    if ( !strncmp(buff, tags[i].tag, strlen(tags[i].tag)) )
                     {
-                        warning("Corrupt timestamp at %s:%d\n=>\t%s", file, currentLine, buff);
-                        return FAIL_TIMESTAMP_CORRUPT;
-                    }
-                }
-                else if ( !strncmp(buff, "DTEND:", strlen("DTEND:")) )
-                {
-                    if ( ICSTimeStampReader(buff + strlen("DTEND:"), &ve.end) != SUCCESS )
-                    {
-                        warning("Corrupt timestamp at %s:%d\n=>\t%s", file, currentLine, buff);
-                        return FAIL_TIMESTAMP_CORRUPT;
-                    }
-                }
-                else if ( !strncmp(buff, "SUMMARY:", strlen("SUMMARY:")) )
-                {
-                    char* tmp = malloc( sizeof(char) * strlen(buff + strlen("SUMMARY:")) );
-                    if (tmp == NULL)
-                    {
-                        warning("Failed to allocate memory for SUMMARY at %s:%d", file, currentLine);
-                        return FAIL_MALLOC;
-                    }
-                    
-                    if (strlen(tmp) > MAX_LINELENGTH)
-                    {
-                        warning("SUMMARY too long at %s:%d", file, currentLine);
-                        return FAIL_OVERFLOW;
-                    }
+                        switch(tags[i].type)
+                        {
+                            case TIMESTAMP:
+                            {
+                                if ( !strcmp(tags[i].tag, "DTSTART:") )
+                                {
+                                    ICSTimeStampReader(buff + strlen(tags[i].tag), &ve.start);
+                                }
+                                else if ( !strcmp(tags[i].tag, "DTEND:") )
+                                {
+                                    ICSTimeStampReader(buff + strlen(tags[i].tag), &ve.end);
+                                }
+                                else
+                                {
+                                    ; // TODO no other TIMESTAMP properties implemented yet
+                                }
+                            }
+                            break;
 
-                    ve.summary = tmp;
-                    strcpy(ve.summary, buff + strlen("SUMMARY:"));
-                }
-                else if ( !strncmp(buff, "LOCATION:", strlen("LOCATION:")) )
-                {
-                    char* tmp = malloc( sizeof(char) * strlen(buff + strlen("LOCATION:")) );
-                    if (tmp == NULL)
-                    {
-                        warning("Failed to allocate memory for LOCATION at %s:%d", file, currentLine);
-                        return FAIL_MALLOC;
-                    }
-                    
-                    if (strlen(tmp) > MAX_LINELENGTH)
-                    {
-                        warning("LOCATION too long at %s:%d", file, currentLine);
-                        return FAIL_OVERFLOW;
-                    }
+                            case STRING:
+                            {
+                                if ( !strcmp(tags[i].tag, "SUMMARY:") )
+                                {
+                                    ve.summary = malloc( sizeof(char) * (strlen(buff) + 1) );
+                                    if ( !ve.summary )
+                                    {
+                                        warning("Failed to allocate memory for an event summary");
+                                        return FAIL_MALLOC;
+                                    }
+                                    strcpy(ve.summary, buff + strlen(tags[i].tag));
+                                }
+                                else if ( !strcmp(tags[i].tag, "LOCATION:") )
+                                {
+                                    ve.location = malloc( sizeof(char) * (strlen(buff) + 1) );
+                                    if ( !ve.location )
+                                    {
+                                        warning("Failed to allocate memory for an event location");
+                                        return FAIL_MALLOC;
+                                    }
+                                    strcpy(ve.location, buff + strlen(tags[i].tag));
+                                }
+                                else if ( !strcmp(tags[i].tag, "DESCRIPTION:") )
+                                {
+                                    ve.description = malloc( sizeof(char) * (strlen(buff) + 1) );
+                                    if ( !ve.description )
+                                    {
+                                        warning("Failed to allocate memory for an event description");
+                                        return FAIL_MALLOC;
+                                    }
+                                    strcpy(ve.description, buff + strlen(tags[i].tag));
+                                }
+                                break;
+                            }
 
-                    ve.location = tmp;
-                    strcpy(ve.location, buff + strlen("LOCATION:"));
-                }
-                else if ( !strncmp(buff, "DESCRIPTION:", strlen("DESCRIPTION:")) )
-                {
-                    char* tmp = malloc( sizeof(char) * strlen(buff + strlen("DESCRIPTION:")) );
-                    if (tmp == NULL)
-                    {
-                        warning("Failed to allocate memory for DESCRIPTION at %s:%d", file, currentLine);
-                        return FAIL_MALLOC;
+                            case NUMBER:
+                            { // TODO we can only handle priority as number
+                                myatoi(buff + strlen(tags[i].tag), &ve.priority);
+                                break;
+                            }
+                        }
                     }
-                    
-                    if (strlen(tmp) > 600)
-                    {
-                        warning("DESCRIPTION too long at %s:%d", file, currentLine);
-                        return FAIL_OVERFLOW;
-                    }
-
-                    ve.description = tmp;
-                    strcpy(ve.description, buff + strlen("DESCRIPTION:"));
                 }
-                else if ( !strncmp(buff, "PRIORITY:", strlen("PRIORITY:")) )
-                {
-                    myatoi(buff + strlen("PRIORITY:"), &ve.priority);
-                }
+                
+                // proceed
                 fgets(buff, sizeof buff, fp);
                 removeNewLineChar(buff);
                 ++currentLine;
             }
-            if ( isValidVEvent(ve) )
-            {
-                Calendar_addVEvent(cal, ve);
-            }
+            
+            Calendar_addVEvent(cal, ve);
         }
-    }           
+    }
     
     return SUCCESS;
 }
@@ -159,7 +162,7 @@ MYERRNO ICS_write(const char* file, const Calendar* cal, WriteMode wm)
         return FAIL_FILE_WRITE;
     }
     
-    /* First, print meta things */
+    /* First, print basic things */
     fprintf(fp, "BEGIN:VCALENDAR\n");
     fprintf(fp, "VERSION:%s\n", ICALVERSION);
 
@@ -234,7 +237,7 @@ MYERRNO Calendar_destroy(Calendar* cal)
 
     while( traveller != cal->last )
     {
-        assert( Calendar_deleteVEvent(cal, traveller->ve) == SUCCESS );
+        VEvent_delete(&traveller->ve);
         traveller = traveller->next;
     }
 
@@ -265,7 +268,7 @@ MYERRNO Calendar_addVEvent(Calendar* cal, VEvent ve)
     
     /* Allocate memory for new entry and set it's pointers */
     VEventNode* tmpven = malloc( sizeof(VEventNode) );
-    if (tmpven == NULL)
+    if ( !tmpven )
     {
         return FAIL_MALLOC;
     }
@@ -289,8 +292,9 @@ MYERRNO Calendar_deleteVEvent(Calendar* cal, VEvent ve)
     assert(cal != NULL && isValidVEvent(ve));
 
     VEventNode* traveller = cal->first->next; // start from first real VEvent
+    
     /* Traverse the Calendar to find specified VEvent */
-    while (traveller->next != cal->last && compareVEvent(traveller->ve, ve))
+    while (traveller->next != cal->last && !compareVEvent(traveller->ve, ve))
     {
         traveller = traveller->next;
     }

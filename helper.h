@@ -12,6 +12,8 @@ int hasICSTag(const char*, const char*);
 
 MYERRNO ICSVEventCounter(const char*, int*);
 
+int isValidPriority(int);
+
 int isValidICSTimeStamp(const char*);
 
 int hasNewLineChar(const char*);

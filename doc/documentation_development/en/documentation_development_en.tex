@@ -1,0 +1,101 @@
+\documentclass[a4paper]{article}
+
+%%%%%%%%%%%%%%%%
+%%% PACKAGES %%%
+%%%%%%%%%%%%%%%%
+
+% language
+\usepackage{polyglossia}
+
+% header and footer
+\usepackage{fancyhdr}
+
+% strikethrough
+\usepackage{ulem}
+
+% references
+\usepackage{hyperref}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+%%% PACKAGE CONFIGS %%%
+%%%%%%%%%%%%%%%%%%%%%%%
+
+% polyglossia - set language to Hungarian
+\setdefaultlanguage{english}
+
+% fancyhdr - setup
+\fancyhead[L]{drunt development documentation}
+\fancyfoot[L]{\today}
+
+% fancyhdr - pagestyle
+\pagestyle{fancy}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% TITLE-AUTHOR-DATE %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\title{Development documentation of \texttt{drunt}}
+\author{Bertalan Zoltán Péter}
+\date{\today}
+
+\begin{document}
+	\begin{titlepage}
+		\maketitle
+	\end{titlepage}
+
+\section{Status report}
+
+Drunt is still under massive development, although it already works with a limited amount of options. Some very important features are still missing though, such as searching for events in the calendar. It is also not yet possible to list the calendar in CLI mode. GUI mode does not exist at all yet.
+
+The delay in the development of drunt is mostly due to the effort made to make the code as error prone as possible: this sometimes results in longer, less legible code, but makes the program more robust in return.
+
+\subsection{What works}
+\begin{itemize}
+	\item interactive mode with limited functionality; working commands:
+	\begin{itemize}
+		\item \texttt{help [command]}
+		\item \texttt{exit [options]}
+		\item \texttt{open [options]}
+		\item \texttt{create \sout{[options]}}
+	\end{itemize}
+	\item files can be loaded into calendar in memory
+	\item files can be created
+	\item calendars can be written into files
+	\item simple events can be added to calendars in memory (and the updated calendar can be saved to originally opened file, overwriting it)
+	\item other functions which shall be used for features to be developed
+\end{itemize}
+
+\subsection{What doesn't work \textit{yet}}
+\begin{itemize}
+	\item GUI mode
+	\item one--time launches (launching drunt without entering interactive mode, in order to perform a single operation)
+	\item calendar listing (user cannot tell drunt to show calendar/events/anything yet)
+	\item searching among events
+	\item creating event with one command (as of yet, the way is to go through a wizard--like setup)
+	\item personal configuration files
+	\item deleting events (because they cannot be identified, since no option to search is available)
+\end{itemize}
+
+\pagebreak
+
+\section{File structure}
+
+The executable file is built from several files. \sout{The tree below illustrates file hierarchy.}
+
+\subsection{\texttt{drunt.c}}
+
+The main \texttt{.c} file. It's sole purpose is to decide what to do upon launch --- it achieves this by checking arguments passed to \texttt{main()}.
+
+\subsection{\texttt{dbHandler.c}}
+
+The name 'dbHandler' is a shortening of 'database handler'. This is probably the file that contains most of the work done by drunt. Functions:
+
+\subsubsection{\texttt{MYERRNO ICS\_load(const char* file, Calendar* cal)}}
+
+This function is responsible for reading \texttt{.ics} files into memory, into a \texttt{Calendar} structure whose address is passed as an argument to the function.
+
+The function first checks the validity with a helper function...
+
+{ \centering \Huge This is how documentation is going to look like }
+
+\end{document}

@@ -1,6 +1,8 @@
 #ifndef STRUCTS_H__
 #define STRUCTS_H__
 
+#include "enums.h"
+
 /* Date & Time */
 
 typedef struct {
@@ -20,6 +22,7 @@ typedef struct {
 } DateTime;
 
 /* Events */
+
 typedef struct {
     DateTime start;
     DateTime end;
@@ -29,12 +32,13 @@ typedef struct {
     int priority;
 } VEvent;
 
-typedef struct {
-    char longName[10];
-    char shortName[4];
-} MonthName; // TODO do I really need this?
+//typedef struct {
+//    char longName[10];
+//    char shortName[4];
+//} MonthName; // TODO do I really need this?
 
 /* Databases */
+
 typedef struct VEventNode_s {
     VEvent ve;
     struct VEventNode_s* prev;
@@ -46,5 +50,13 @@ typedef struct {
     VEventNode* first;
     VEventNode* last;
 } Calendar;
+
+/* Misc */
+
+typedef struct {
+    char* tag;
+    ICSDATATYPE type;
+    int flag;
+} ICSTag;
 
 #endif
