@@ -18,7 +18,17 @@
 // ARRAYS //
 ////////////
 
-// TODO none
+static const char* commands[] = {
+    "help",
+    "exit",
+    "open",
+    "create",
+    "modify",
+    "delete",
+    "list"
+};
+
+static size_t numberOfCommands = ( sizeof commands / sizeof(char*) );
 
 ///////////////
 // FUNCTIONS //
@@ -42,14 +52,6 @@ int command_list(char**);
 // FUNCTION POINTERS //
 ///////////////////////
 
-static int (*runCommand[])(char**) = {
-    &command_help,
-    &command_exit,
-    &command_open,
-    &command_create,
-    &command_modify,
-    &command_delete,
-    &command_list
-};
+extern int (*runCommand[])(char**);
 
 #endif

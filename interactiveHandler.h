@@ -42,4 +42,8 @@ void shell(void);
 
 void shell_say(ShellSays, const char*, ...);
 
+int shell_readTimeStamp(DateTime*, TIMESTAMPTYPE);
+
+int shell_readString(char**);
+
 #endif

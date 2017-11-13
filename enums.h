@@ -78,6 +78,11 @@ typedef enum {
 } ShellSays;
 
 typedef enum {
+    DTSTART,
+    DTEND
+} TIMESTAMPTYPE;
+
+typedef enum {
     BEFORE,
     SAME,
     AFTER,

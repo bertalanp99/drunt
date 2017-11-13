@@ -10,6 +10,13 @@
 
 int main(int argc, char *argv[])
 { 
+    printf("DEBUG Argument count: %d\n", argc);
+    for (int i = 1; i < argc; ++i)
+    {
+        printf("DEBUG argument %d: %s\n", i, argv[i]);
+    }
+
+    printf("\n");
     shell();
     return 0;
 }

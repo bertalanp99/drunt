@@ -204,3 +204,124 @@ void shell_say(ShellSays ss, const char* message, ...)
     }
 }
 
+int shell_readTimeStamp(DateTime* dt, TIMESTAMPTYPE tt)
+{
+    char* type;
+    switch (tt)
+    {
+        case DTSTART:
+        {
+            type = "STARTING";
+            break;
+        }
+
+        case DTEND:
+        {
+            type = "ENDING";
+            break;
+        }
+
+        default:
+        {
+            shell_say(ERROR, "Programmer error...");
+            return 1;
+        }
+    }
+
+    char buff[BUFFSIZE];
+        
+    int done = 1;
+
+    
+    do
+    {
+        do
+        {
+            shell_say(PROMPT, "%s date:", type);
+            if ( !fgets(buff, sizeof buff, stdin) )
+            {
+                putchar('\n');
+                shell_say(WARNING, "Received EOF, cancelling...");
+                return 0;
+            }
+
+            if (
+                    sscanf(buff, "%04d %02d %02d %02d %02d",
+                        &dt->date.year, &dt->date.month, &dt->date.day,
+                        &dt->time.hour, &dt->time.minute)
+                    < 5
+                )
+            {
+                shell_say(ERROR, "Insufficient number of details entered. Perhaps you forgot something?");
+                done = 0;
+            }
+            else
+            {
+                if (!isValidYear(dt->date.year))
+                {
+                    shell_say(ERROR, "Invalid input for year: %04d", dt->date.year);
+                }
+                
+                if (!isValidMonth(dt->date.month))
+                {
+                    shell_say(ERROR, "Invalid input for month: %02d", dt->date.month);
+                }
+
+                if (!isValidDay(dt->date.day))
+                {
+                    shell_say(ERROR, "Invalid input for day: %02d", dt->date.day);
+                }
+
+                if (!isValidHour(dt->time.hour))
+                {
+                    shell_say(ERROR, "Invalid input for hour: %02d", dt->time.hour);
+                }
+
+                if (!isValidMinute(dt->time.minute))
+                {
+                    shell_say(ERROR, "Invalid input for minute: %02d", dt->time.minute);
+                }
+
+                done = 1;
+            }
+        }
+        while (!isValidDateTime(*dt));
+    }
+    while (!done);
+
+    return 1;
+}
+
+int shell_readString(char** str)
+{
+    char buff[BUFFSIZE];
+
+    do
+    {
+        if ( !fgets(buff, sizeof buff, stdin) )
+        {
+            putchar('\n');
+            shell_say(WARNING, "Received EOF, cancelling...");
+            return 0;
+        }
+        
+        removeNewLineChar(buff);
+        if (strlen(buff) > MAX_LINELENGTH)
+        {
+            shell_say(ERROR, "Entered string is too long. Please enter a maximum of %d characters.", MAX_LINELENGTH);
+        }
+    }
+    while (strlen(buff) > MAX_LINELENGTH);
+
+    char* tmp = malloc( sizeof(char) * (strlen(buff) + 1) );
+    if (!tmp)
+    {
+        shell_say(ERROR, "Failed to allocate memory for string!");
+        return 0;
+    }
+    *str = tmp;
+
+    strcpy(*str, buff);
+
+    return 1;
+}
