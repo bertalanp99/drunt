@@ -23,14 +23,8 @@ int isLeapYear(const int year)
         return -1;
     }
     
-    return ( (year % 4 == 0) && (year % 100 != 0) && (year % 400 == 0) );
+    return ( ( (year % 4 == 0) && (year % 100 != 0) ) || (year % 400 == 0) );
 }
-
-/*int hasICSTag(const char* str, const char* tag)
-{
-    assert(str != NULL && tag != NULL);
-    return !strncmp(str, tag, strlen(tag));
-}*/ // TODO unused
 
 MYERRNO ICSVEventCounter(const char* file, int* n)
 {
@@ -553,27 +547,6 @@ int myatoi(const char* str, int* out) // TODO CREDIT THIS FUNCTION TO "https://s
     return 1;
 }
 
-//void icsTagRemover(char* original, char* new)
-//{
-//    assert
-//        (   
-//            original != NULL      && new != NULL        &&
-//            !strcmp(original, "") && !strcmp(new, "")
-//        );
-//
-//    /* Look for iCalendar tag in input string */
-//    for (int i = 0; ICSTags[i] != NULL; ++i)
-//    {
-//        if ( !strncmp(original, ICSTags[i], strlen(ICSTags[i])) )
-//        {
-//            new = (original + strlen(ICSTags[i])); // found tag --> store it in new and return
-//            return;
-//        }
-//    }
-//    
-//    new = NULL; // could not find tag, return NULL to indicate
-//} // TODO unused
-    
 int promptYN(char* message, ...)
 {
     assert(message != NULL);

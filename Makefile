@@ -2,7 +2,7 @@ CFILES=dbHandler.c debug.c drunt.c errorHandler.c helper.c
 CC=gcc
 CFLAGS=-Wall -Wextra -Wno-sign-compare -std=c99 -g
 
-all quiet: CFLAGS=-std=c99 -g clean drunt
+aquiet: CFLAGS=-std=c99 -g clean drunt
 
 all: clean drunt
 

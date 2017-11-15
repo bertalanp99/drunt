@@ -15,8 +15,8 @@
 
 #define MAX_PATHLENGTH 128
 #define DEFAULTFILE "calendar.ics"
-#define BUFFSIZE 256
-#define MAX_COMMANDLENGTH 128
+#define BUFFSIZE 512
+#define MAX_COMMANDLENGTH 256
 #define TOKEN_BUFFSIZE 64
 #define MAX_TOKEN_NUMBER 16
 #define TOKEN_DELIMITER " \t\r\n"

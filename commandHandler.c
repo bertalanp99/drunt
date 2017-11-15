@@ -418,24 +418,6 @@ int command_create(char** args)
             sscanf(buff, "%d", &ve.priority);
         }
         while ( !isValidPriority(ve.priority) );
-        
-        /* Confirm event with user */
-
-        shell_say(NEUTRAL, "Event to be created:");
-        // TODO event lister
-        
-        if (!promptYN("[ ?? ] Confirm?"))
-        {
-            shell_say(STATUS, "No event created");
-            return 1;
-        }
-        else
-        {
-            shell_say(PROGRESS, "Adding new event to calendar...");
-            Calendar_addVEvent(&calendar, ve);
-            shell_say(DONE, "Successfully added new event!");
-            return 1;
-        }
     }
     else
     {
@@ -457,159 +439,205 @@ int command_create(char** args)
         
         size_t numberOfOptions = ( sizeof options / sizeof(Option) );
         
-        for (int i = 0; args[i] != NULL; ++i)
+        for (int i = 1; args[i] != NULL; ++i)
         {
             for (int j = 0; j < numberOfOptions; ++j)
             {
                 if ( !strcmp(args[i], options[j].opt) || !strcmp(args[i], options[j].opt_short) )
                 {
-                    ; // TODO
+                    switch (options[j].type)
+                    {
+                        case TIMESTAMP:
+                        {
+                            if ( !strcmp(options[j].opt, "--begin") )
+                            {
+                                switch (ICSTimeStampReader(args[i+1], &ve.start))
+                                {
+                                    case FAIL_TIMESTAMP_CORRUPT:
+                                    {
+                                        shell_say(ERROR, "DTSTART timestamp '%s' is invalid!", args[i+1]);
+                                        return 1;
+                                    }
+
+                                    default:
+                                    {
+                                        break;
+                                    }
+                                }
+                            }
+                            else if ( !strcmp(options[j].opt, "--end") )
+                            {
+                                switch (ICSTimeStampReader(args[i+1], &ve.start))
+                                {
+                                    case FAIL_TIMESTAMP_CORRUPT:
+                                    {
+                                        shell_say(ERROR, "DTSTRAT timestamp '%s' is invalid!", args[i+1]);
+                                        return 1;
+                                    }
+
+                                    default:
+                                    {
+                                        break;
+                                    }
+                                }
+                            }
+                            options[j].flag = 1;
+                            break;
+                        }
+
+                        case STRING:
+                        {
+                            char* tmp = malloc( sizeof(char) * (strlen(args[i+1] + 1)) );
+                            if (!tmp)
+                            {
+                                shell_say(ERROR, "Failed to allocate memory for event %s!", options[j].opt + 2);
+                                return 1;
+                            }
+                            
+                            if ( !strcmp(options[j].opt, "--summary") )
+                            {
+                                ve.summary = tmp;
+                                strcpy(ve.summary, args[i+1]);
+                            }
+                            else if ( !strcmp(options[j].opt, "--location") )
+                            {
+                                ve.summary = tmp;
+                                strcpy(ve.summary, args[i+1]);
+                            }
+                            else if ( !strcmp(options[j].opt, "--description") )
+                            {
+                                ve.description = tmp;
+                                strcpy(ve.description, args[i+1]);
+                            }
+                            options[j].flag = 1;
+                            break;
+                        }
+
+                        case NUMBER:
+                        { // note: drunt only handles priorities as numbers as of yet
+                            if ( !myatoi(args[i+1], &ve.priority) )
+                            {
+                                shell_say(ERROR, "Failed to convert event priority '%s' to a number!", args[i+1]);
+                                return 1;
+                            }
+
+                            if ( !isValidPriority(ve.priority) )
+                            {
+                                shell_say(ERROR, "Invalid priority value '%d'! Please check 'help' for more information", ve.priority);
+                                return 1;
+                            }
+                            options[j].flag = 1;
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    shell_say(ERROR, "Invalid option '%s'. See 'help create' for a list of available options", args[i]);
+                    return 1;
+                }
+
+                /* Prompt for omitted details */
+
+                for (int i = 0; i < numberOfOptions; ++i)
+                {
+                    if ( !options[i].flag )
+                    {
+                        switch (options[j].type)
+                        {
+                            case TIMESTAMP:
+                            {
+                                if ( !strcmp(options[j].opt, "--begin") )
+                                {
+                                    if ( !shell_readTimeStamp(&ve.start, DTSTART) )
+                                    {
+                                        return 1;
+                                    }
+                                }
+                                else if ( !strcmp(options[j].opt, "--end") )
+                                {
+                                    if ( !shell_readTimeStamp(&ve.end, DTEND) )
+                                    {
+                                        return 1;
+                                    }
+                                }
+                                break;
+                            }
+
+                            case STRING:
+                            {
+                                char* tmp = malloc( sizeof(char) * (strlen(args[i+1] + 1)) );
+                                if (!tmp)
+                                {
+                                    shell_say(ERROR, "Failed to allocate memory for event %s!", options[j].opt + 2);
+                                    return 1;
+                                }
+                                
+                                if ( !strcmp(options[j].opt, "--summary") )
+                                {
+                                    shell_say(PROMPT, "Event summary:");
+                                    if ( !shell_readString(&ve.summary) )
+                                    {
+                                        return 1;
+                                    }
+                                }
+                                else if ( !strcmp(options[j].opt, "--location") )
+                                {
+                                    shell_say(PROMPT, "Event location:");
+                                    if ( !shell_readString(&ve.location) )
+                                    {
+                                        return 1;
+                                    }
+                                }
+                                else if ( !strcmp(options[j].opt, "--description") )
+                                {
+                                    shell_say(PROMPT, "Event description:");
+                                    if ( !shell_readString(&ve.location) )
+                                    {
+                                        return 1;
+                                    }
+                                }
+                                break;
+                            }
+
+                            case NUMBER:
+                            { // note: drunt only handles priorities as numbers as of yet
+                                shell_say(PROMPT, "Event priority:");
+                                
+                                char buff[BUFFSIZE];
+
+                                do
+                                {
+                                    fgets(buff, sizeof buff, stdin);
+                                    sscanf(buff, "%d", &ve.priority);
+                                }
+                                while ( !isValidPriority(ve.priority) );
+                                break;
+                            }
+                        }
+                    }
                 }
             }
         }
-        
-        //for (int i = 1; args[i] != NULL; ++i)
-        //{
-        //    for (int j = 0; j < numberOfOptions; j += 2)
-        //    {
-        //        if ( !strcmp(args[i], options[j]) || !strcmp(args[i], options[j+1]) )
-        //        { // TODO improve !!!
-        //            if (j == 0)
-        //            {
-        //                if ( !args[i + 1] )
-        //                {
-        //                    shell_say(ERROR, "Option --begin / -b missing argument (timestamp)");
-        //                    return 1;
-        //                }
-        //                else
-        //                {
-        //                    if ( !isValidICSTimeStamp(args[i + 1]) )
-        //                    {
-        //                        shell_say(ERROR, "Option --begin / -b received invalid timestamp! Check 'help create' for details!");
-        //                        return 1;
-        //                    }
-        //                    else
-        //                    {
-        //                        ICSTimeStampReader(args[i + 1], &ve.start);
-        //                        DTSTARTFlag = 1;
-        //                    }
-        //                }
-        //            }
-        //            else if (j == 2)
-        //            {
-        //                if ( !args[i + 1] )
-        //                {
-        //                    shell_say(ERROR, "Option --end / -e missing argument (timestamp)");
-        //                    return 1;
-        //                }
-        //                else
-        //                {
-        //                    if ( !isValidICSTimeStamp(args[i + 1]) )
-        //                    {
-        //                        shell_say(ERROR, "Option --end / -e received invalid timestamp! Check 'help create' for details!");
-        //                        return 1;
-        //                    }
-        //                    else
-        //                    {
-        //                        ICSTimeStampReader(args[i + 1], &ve.end);
-        //                        DTENDFlag = 1;
-        //                    }
-        //                }
-        //            }
-        //            else if (j == 4)
-        //            {
-        //                if ( !args[i + 1] )
-        //                {
-        //                    shell_say(ERROR, "Option --summary / -s missing argument (text)");
-        //                    return 1;
-        //                }
-        //                else
-        //                {
-        //                    ve.summary = malloc( sizeof(char) * (strlen(args[i + 1]) + 1) );
-        //                    if (!ve.summary)
-        //                    {
-        //                        shell_say(ERROR, "Failed to allocate memory for summary field!");
-        //                        return 1;
-        //                    }
-        //                    strcpy(ve.summary, args[i+1]);
-        //                    summaryFlag = 1;
-        //                }
-        //            }
-        //            else if (j == 6)
-        //            {
-        //                if ( !args[i + 1] )
-        //                {
-        //                    shell_say(ERROR, "Option --location / -l missing argument (text)");
-        //                    return 1;
-        //                }
-        //                else
-        //                {
-        //                    ve.location = malloc( sizeof(char) * (strlen(args[i + 1]) + 1) );
-        //                    if (!ve.location)
-        //                    {
-        //                        shell_say(ERROR, "Failed to allocate memory for location field!");
-        //                        return 1;
-        //                    }
-        //                    strcpy(ve.location, args[i+1]);
-        //                    locationFlag = 1;
-        //                }
-        //            }
-        //            else if (j == 8)
-        //            {
-        //                if ( !args[i + 1] )
-        //                {
-        //                    shell_say(ERROR, "Option --description / -d missing argument (text)");
-        //                    return 1;
-        //                }
-        //                else
-        //                {
-        //                    ve.description = malloc( sizeof(char) * (strlen(args[i + 1]) + 1) );
-        //                    if (!ve.description)
-        //                    {
-        //                        shell_say(ERROR, "Failed to allocate memory for description field!");
-        //                        return 1;
-        //                    }
-        //                    strcpy(ve.description, args[i+1]);
-        //                    descriptionFlag = 1;
-        //                }
-        //            }
-        //            else if (j == 10)
-        //            {
-        //                if ( !args[i + 1] )
-        //                {
-        //                    shell_say(ERROR, "Option --priority / -p missing argument (number 0-9)"); // TODO VALID
-        //                    return 1;
-        //                }
-        //                else
-        //                {
-        //                    if ( !myatoi(args[i + 1], &ve.priority) )
-        //                    {
-        //                        shell_say(ERROR, "Failed to interpret priority value entered!");
-        //                        return 1;
-        //                    }
-        //                    else
-        //                    {
-        //                        priorityFlag = 1;
-        //                    }
-        //                }
-        //            }
-        //        }
-        //        else
-        //        {
-        //            shell_say(ERROR, "Invalid option '%s'!", args[i]);
-        //            return 1;
-        //        }
-        //    }
-        //}
+    }
 
-        //if (!DTSTARTFlag)
-        //{
-        //    // TODO READER
-        //}
+    /* Confirm event with user */
 
+    shell_say(NEUTRAL, "Event to be created:");
+    // TODO event lister
+    
+    if (!promptYN("[ ?? ] Confirm?"))
+    {
+        shell_say(STATUS, "No event created");
         return 1;
     }
-    return 1;
+    else
+    {
+        shell_say(PROGRESS, "Adding new event to calendar...");
+        Calendar_addVEvent(&calendar, ve);
+        shell_say(DONE, "Successfully added new event!");
+        return 1;
+    }
 }
 
 int command_modify(char** args)
