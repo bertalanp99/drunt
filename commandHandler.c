@@ -441,6 +441,8 @@ int command_create(char** args)
         
         for (int i = 1; args[i] != NULL; ++i)
         {
+            int wasValidOption = 1;
+
             for (int j = 0; j < numberOfOptions; ++j)
             {
                 if ( !strcmp(args[i], options[j].opt) || !strcmp(args[i], options[j].opt_short) )
@@ -467,11 +469,11 @@ int command_create(char** args)
                             }
                             else if ( !strcmp(options[j].opt, "--end") )
                             {
-                                switch (ICSTimeStampReader(args[i+1], &ve.start))
+                                switch (ICSTimeStampReader(args[i+1], &ve.end))
                                 {
                                     case FAIL_TIMESTAMP_CORRUPT:
                                     {
-                                        shell_say(ERROR, "DTSTRAT timestamp '%s' is invalid!", args[i+1]);
+                                        shell_say(ERROR, "DTEND timestamp '%s' is invalid!", args[i+1]);
                                         return 1;
                                     }
 
@@ -481,13 +483,40 @@ int command_create(char** args)
                                     }
                                 }
                             }
-                            options[j].flag = 1;
                             break;
                         }
 
                         case STRING:
                         {
-                            char* tmp = malloc( sizeof(char) * (strlen(args[i+1] + 1)) );
+                            /* Special case, we need to find where string actually ends */
+
+                            int numberOfCharacters = 0;
+                            int firstWord = i + 1;
+                            if (args[i+1][0] != '\'')
+                            {
+                                shell_say(ERROR, "Strings need to be bounded with apostrophes! See 'help create' for more information");
+                                return 1;
+                            }
+                            else
+                            {
+                                int hasClosingApostrophe = 0;
+                                for (i = i + 1; args[i] != NULL || hasClosingApostrophe; ++i)
+                                {
+                                    if (args[i][ strlen(args[i] - 1) ] == '\'')
+                                    {
+                                        hasClosingApostrophe = 1;
+                                    }
+                                    numberOfCharacters += strlen(args[i]);
+                                }
+
+                                if (!hasClosingApostrophe)
+                                {
+                                    shell_say(ERROR, "String missing closing apostrophe! Strings have to be bounded by two apostrophes, like this 'my text'");
+                                    return 1;
+                                }
+                            }
+
+                            char* tmp = malloc( sizeof(char) * (numberOfCharacters + 1) );
                             if (!tmp)
                             {
                                 shell_say(ERROR, "Failed to allocate memory for event %s!", options[j].opt + 2);
@@ -497,19 +526,27 @@ int command_create(char** args)
                             if ( !strcmp(options[j].opt, "--summary") )
                             {
                                 ve.summary = tmp;
-                                strcpy(ve.summary, args[i+1]);
+                                for (int k = firstWord; k < i; k++)
+                                {
+                                    strcat(ve.summary, args[k]);
+                                }
                             }
                             else if ( !strcmp(options[j].opt, "--location") )
                             {
-                                ve.summary = tmp;
-                                strcpy(ve.summary, args[i+1]);
+                                ve.location = tmp;
+                                for (int k = firstWord; k < i; k++)
+                                {
+                                    strcat(ve.location, args[k]);
+                                }
                             }
                             else if ( !strcmp(options[j].opt, "--description") )
                             {
                                 ve.description = tmp;
-                                strcpy(ve.description, args[i+1]);
+                                for (int k = firstWord; k < i; k++)
+                                {
+                                    strcat(ve.location, args[k]);
+                                }
                             }
-                            options[j].flag = 1;
                             break;
                         }
 
@@ -526,95 +563,94 @@ int command_create(char** args)
                                 shell_say(ERROR, "Invalid priority value '%d'! Please check 'help' for more information", ve.priority);
                                 return 1;
                             }
-                            options[j].flag = 1;
                             break;
                         }
                     }
+                    options[j].flag = 1;
                 }
-                else
+                else if (j == numberOfOptions)
                 {
-                    shell_say(ERROR, "Invalid option '%s'. See 'help create' for a list of available options", args[i]);
-                    return 1;
+                    wasValidOption = 0;
                 }
+            }
 
-                /* Prompt for omitted details */
+            if (!wasValidOption)
+            {   
+                shell_say(ERROR, "Invalid option '%s'. See 'help create' for a list of available options", args[i]);
+                return 1;
+            }
 
-                for (int i = 0; i < numberOfOptions; ++i)
+        }
+        
+        /* Prompt for omitted details */
+
+        for (int i = 0; i < numberOfOptions; ++i)
+        {
+            if ( !options[i].flag )
+            {
+                switch (options[i].type)
                 {
-                    if ( !options[i].flag )
+                    case TIMESTAMP:
                     {
-                        switch (options[j].type)
+                        if ( !strcmp(options[i].opt, "--begin") )
                         {
-                            case TIMESTAMP:
+                            if ( !shell_readTimeStamp(&ve.start, DTSTART) )
                             {
-                                if ( !strcmp(options[j].opt, "--begin") )
-                                {
-                                    if ( !shell_readTimeStamp(&ve.start, DTSTART) )
-                                    {
-                                        return 1;
-                                    }
-                                }
-                                else if ( !strcmp(options[j].opt, "--end") )
-                                {
-                                    if ( !shell_readTimeStamp(&ve.end, DTEND) )
-                                    {
-                                        return 1;
-                                    }
-                                }
-                                break;
-                            }
-
-                            case STRING:
-                            {
-                                char* tmp = malloc( sizeof(char) * (strlen(args[i+1] + 1)) );
-                                if (!tmp)
-                                {
-                                    shell_say(ERROR, "Failed to allocate memory for event %s!", options[j].opt + 2);
-                                    return 1;
-                                }
-                                
-                                if ( !strcmp(options[j].opt, "--summary") )
-                                {
-                                    shell_say(PROMPT, "Event summary:");
-                                    if ( !shell_readString(&ve.summary) )
-                                    {
-                                        return 1;
-                                    }
-                                }
-                                else if ( !strcmp(options[j].opt, "--location") )
-                                {
-                                    shell_say(PROMPT, "Event location:");
-                                    if ( !shell_readString(&ve.location) )
-                                    {
-                                        return 1;
-                                    }
-                                }
-                                else if ( !strcmp(options[j].opt, "--description") )
-                                {
-                                    shell_say(PROMPT, "Event description:");
-                                    if ( !shell_readString(&ve.location) )
-                                    {
-                                        return 1;
-                                    }
-                                }
-                                break;
-                            }
-
-                            case NUMBER:
-                            { // note: drunt only handles priorities as numbers as of yet
-                                shell_say(PROMPT, "Event priority:");
-                                
-                                char buff[BUFFSIZE];
-
-                                do
-                                {
-                                    fgets(buff, sizeof buff, stdin);
-                                    sscanf(buff, "%d", &ve.priority);
-                                }
-                                while ( !isValidPriority(ve.priority) );
-                                break;
+                                return 1;
                             }
                         }
+                        else if ( !strcmp(options[i].opt, "--end") )
+                        {
+                            if ( !shell_readTimeStamp(&ve.end, DTEND) )
+                            {
+                                return 1;
+                            }
+                        }
+                        break;
+                    }
+
+                    case STRING:
+                    {
+                        if ( !strcmp(options[i].opt, "--summary") )
+                        {
+                            shell_say(PROMPT, "Event summary:");
+                            if ( !shell_readString(&ve.summary) )
+                            {
+                                return 1;
+                            }
+                        }
+                        else if ( !strcmp(options[i].opt, "--location") )
+                        {
+                            shell_say(PROMPT, "Event location:");
+                            if ( !shell_readString(&ve.location) )
+                            {
+                                return 1;
+                            }
+                        }
+                        else if ( !strcmp(options[i].opt, "--description") )
+                        {
+                            shell_say(PROMPT, "Event description:");
+                            if ( !shell_readString(&ve.description) )
+                            {
+                                return 1;
+                            }
+                        }
+                        break;
+                    }
+
+                    case NUMBER:
+                    { // note: drunt only handles priorities as numbers as of yet
+                        shell_say(PROMPT, "Event priority:");
+                        
+                        char buff[BUFFSIZE];
+
+                        do
+                        {
+                            fgets(buff, sizeof buff, stdin);
+                            sscanf(buff, "%d", &ve.priority);
+                        }
+                        while ( !isValidPriority(ve.priority) );
+                        break;
                     }
                 }
             }

@@ -16,7 +16,7 @@ int main(int argc, char *argv[])
         printf("DEBUG argument %d: %s\n", i, argv[i]);
     }
 
-    printf("DEBUG ICS timestamp 20171115100000Z validity: %d\n", isValidICSTimeStamp("20171115100000Z")); 
+    printf("DEBUG ICS timestamp 20171115T100000Z validity: %d\n", isValidICSTimeStamp("20171115T100000Z")); 
 
     printf("\n");
     shell();
