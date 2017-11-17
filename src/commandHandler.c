@@ -445,7 +445,7 @@ int command_create(char** args)
 
             for (int j = 0; j < numberOfOptions; ++j)
             {
-                if ( !strcmp(args[i], options[j].opt) || !strcmp(args[i], options[j].opt_short) )
+                if ( args[i] && !strcmp(args[i], options[j].opt) || !strcmp(args[i], options[j].opt_short) )
                 {
                     switch (options[j].type)
                     {
@@ -492,7 +492,7 @@ int command_create(char** args)
 
                             int numberOfCharacters = 0;
                             int firstWord = i + 1;
-                            if (args[i+1][0] != '\'')
+                            if (args[firstWord][0] != '\'')
                             {
                                 shell_say(ERROR, "Strings need to be bounded with apostrophes! See 'help create' for more information");
                                 return 1;
@@ -500,13 +500,13 @@ int command_create(char** args)
                             else
                             {
                                 int hasClosingApostrophe = 0;
-                                for (i = i + 1; args[i] != NULL || hasClosingApostrophe; ++i)
+                                for (i = firstWord; args[i] != NULL || !hasClosingApostrophe; ++i)
                                 {
-                                    if (args[i][ strlen(args[i] - 1) ] == '\'')
+                                    if (args[i][ strlen(args[i]) - 1 ] == '\'')
                                     {
                                         hasClosingApostrophe = 1;
                                     }
-                                    numberOfCharacters += strlen(args[i]);
+                                    numberOfCharacters += (strlen(args[i]) + 1); // also count spaces
                                 }
 
                                 if (!hasClosingApostrophe)
@@ -567,6 +567,7 @@ int command_create(char** args)
                         }
                     }
                     options[j].flag = 1;
+                    break;
                 }
                 else if (j == numberOfOptions)
                 {
@@ -579,7 +580,6 @@ int command_create(char** args)
                 shell_say(ERROR, "Invalid option '%s'. See 'help create' for a list of available options", args[i]);
                 return 1;
             }
-
         }
         
         /* Prompt for omitted details */
