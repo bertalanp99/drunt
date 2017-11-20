@@ -355,6 +355,7 @@ int command_open(char** args)
 
 int command_create(char** args)
 {
+    /* First, check whether there's an open file */
     if (!file)
     {
         shell_say(WARNING, "No file has been opened yet; you are editing an empty calendar.");
@@ -365,6 +366,7 @@ int command_create(char** args)
         }
     }
     
+    /* Create empty VEvent to fill */
     VEvent ve = {
         .start = {
             .date = { .year = 0, .month = 0, .day = 0 },
@@ -378,6 +380,7 @@ int command_create(char** args)
         .priority = 10
     };
     
+    /* NO ARGUMENTS PASSED */
     if (!args[1])
     {
         /* Read event details one by one */
@@ -405,7 +408,7 @@ int command_create(char** args)
         }
         
         shell_say(PROMPT, "Event description:");
-        if ( !shell_readString(&ve.location) )
+        if ( !shell_readString(&ve.description) )
         {
             return 1;
         }
@@ -421,6 +424,8 @@ int command_create(char** args)
         }
         while ( !isValidPriority(ve.priority) );
     }
+    
+    /* THERE IS AT LEAST ONE ARGUMENT PASSED */
     else
     {
         typedef struct {
@@ -670,12 +675,12 @@ int command_create(char** args)
                 }
             }
         }
-    }
+    } // TODO debug second case
 
     /* Confirm event with user */
 
     shell_say(NEUTRAL, "Event to be created:");
-    // TODO event lister
+    printVEvent(ve);
     
     if (!promptYN("[ ?? ] Confirm?"))
     {
@@ -773,21 +778,38 @@ int command_list(char** args)
     {
         // TODO list day
     }
-    else if ( !strcmp(args[1], "agenda") )
+    else if ( !strcmp(args[1], "agenda") ) // TODO create separate functions
     {
-        if ( !args[2] )
+        if ( !args[2] ) // no argument --> list this week
         {
-            // TODO agenda this week
+            DateTime now = currentDateTime();
+            DateTime until = addDaysToDateTime(now, 7);
+
+            /* Traverse calendar until first event after 'now' is found */
+            VEventNode* traveller = calendar.first->next;
+            while (traveller != calendar.last && compareDateTime(traveller->ve.start, now) == BEFORE)
+            {
+                traveller = traveller->next;
+            }
+
+            /* Keep traversing, but also print events in given period */
+            int count = 1;
+            while (traveller != calendar.last && compareDateTime(traveller->ve.start, until) != AFTER)
+            {
+                printVEventWCount(traveller->ve, count);
+                ++count;
+                traveller = traveller->next;
+            }
+
         }
-        else if ( !args[3] )
+        else if ( !args[3] ) // argument passed --> process
         {
             int period;
-            if ( !myatoi(args[3], &period) )
+            if ( !myatoi(args[2], &period) )
             {
                 shell_say(ERROR, "Number of days passed to 'list agenda' could not be converted to a number! Please check?");
                 return 1;
             }
-
 
             DateTime now = currentDateTime();
             DateTime until = addDaysToDateTime(now, period);
@@ -799,16 +821,14 @@ int command_list(char** args)
                 traveller = traveller->next;
             }
 
-            
-
             /* Keep traversing, but also print events in given period */
-            int sofar = 0;
-            while (traveller != calendar.last && sofar <= period)
+            int count = 1;
+            while (traveller != calendar.last && compareDateTime(traveller->ve.start, until) != AFTER)
             {
-                ;
-            }                // TODO print event function
-
-            // TODO agenda in period
+                printVEventWCount(traveller->ve, count);
+                ++count;
+                traveller = traveller->next;
+            }
         }
         else
         {

@@ -1,23 +1,6 @@
 #ifndef ENUMS_H__
 #define ENUMS_H__
 
-// Long month names
-typedef enum {
-    January,
-    February,
-    March,
-    April,
-    May,
-    June,
-    July,
-    August,
-    September,
-    October,
-    November,
-    December
-} LongMonth; // TODO unused as of yet. Do I even need this?
-
-// Short month names
 typedef enum {
     jan,
     feb,
@@ -31,7 +14,7 @@ typedef enum {
     oct,
     nov,
     dec
-} Month; // TODO use this
+} Month; 
 
 // ---------------------
 

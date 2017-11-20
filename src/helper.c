@@ -610,6 +610,7 @@ DateTime currentDateTime(void)
         "Apr",
         "May",
         "Jun",
+        "Jul",
         "Aug",
         "Sep",
         "Oct",
@@ -632,41 +633,70 @@ DateTime currentDateTime(void)
         if ( !strncmp(months[i], formatted + position, 3) )
         {
             dt.date.month = i + 1;
+            break;
         }
     }
 
     position = 8;
-    char day[2] = { formatted[position], formatted[position + 1] };
+    char day[3] = { formatted[position], formatted[position + 1], '\0' };
     myatoi(day, &dt.date.day);
 
     position = 11;
-    char hour[2] = { formatted[position], formatted[position + 1] };
+    char hour[3] = { formatted[position], formatted[position + 1], '\0' };
     myatoi(hour, &dt.time.hour);
 
     position = 14;
-    char min[2]= { formatted[position], formatted[position + 1] };
+    char min[3]= { formatted[position], formatted[position + 1], '\0' };
     myatoi(min, &dt.time.minute);
 
     position = 20;
     myatoi(formatted + position, &dt.date.year);
+
+    // check programmer error
+    assert(isValidDateTime(dt));
 
     return dt;
 }
 
 DateTime addDaysToDateTime(const DateTime from, const int days)
 {
+    assert(isValidDateTime(from));
+    
     DateTime dt = from;
     for (int i = 0; i < days; ++i)
     {
-        if (monthOverflows(dt.month))
+        if (monthOverflows(dt.date.month))
         {
             ++dt.date.year;
             dt.date.month = 1;
+        }
+
+        if (dayOverflows(dt.date.day, dt.date.month, dt.date.year))
+        {
+            ++dt.date.month;
             dt.date.day = 1;
         }
 
-        if (dayOverflows(dt.day, dt.month))
-            
+        ++dt.date.day;
+    }
+        
+    if (monthOverflows(dt.date.month))
+    {
+        ++dt.date.year;
+        dt.date.month = 1;
+        dt.date.day = 1;
+    }
+
+    if (dayOverflows(dt.date.day, dt.date.month, dt.date.year))
+    {
+        ++dt.date.month;
+        dt.date.day = 1;
+    }
+    
+    // check for programmer error
+    assert(isValidDateTime(dt));
+
+    return dt;
 }
 
 int monthOverflows(const int month)
@@ -674,8 +704,59 @@ int monthOverflows(const int month)
     return (month > 12);
 }
 
-int dayOverFlows(const int day, const int month)
+int dayOverflows(const int day, const int month, const int year)
 {
-    // TODO
+    int monthLength[12] = {
+        31, // Jan
+        28, // Feb
+        31, // Mar
+        30, // Apr
+        31, // May
+        30, // Jun
+        31, // Jul
+        31, // Aug
+        30, // Sep
+        31, // Oct
+        30, // Nov
+        31, // Dec
+    };
+
+    if (isLeapYear(year))
+    {
+        monthLength[feb] = 29;
+    }
+
+    return (day > monthLength[month - 1]);
 }
 
+void printVEventWCount(const VEvent ve, const int no)
+{
+    printf("\n| VEVENT %02d |\n", no);
+    printf("Start:\t\t%04d/%02d/%02d %02d.%02d [Z]\n",
+            ve.start.date.year, ve.start.date.month, ve.start.date.day,
+            ve.start.time.hour, ve.start.time.minute);
+    printf("End:\t\t%04d/%02d/%02d %02d.%02d [Z]\n",
+            ve.end.date.year, ve.end.date.month, ve.end.date.day,
+            ve.end.time.hour, ve.end.time.minute);
+    printf("Summary:\t%s\n", ve.summary);
+    printf("Location:\t%s\n", ve.location);
+    printf("Description:\t%s\n", ve.description);
+    printf("Priority:\t%d\n", ve.priority);
+    printf("\n");
+}
+
+void printVEvent(const VEvent ve)
+{
+    printf("\n| VEVENT |\n");
+    printf("Start:\t\t%04d/%02d/%02d %02d.%02d [Z]\n",
+            ve.start.date.year, ve.start.date.month, ve.start.date.day,
+            ve.start.time.hour, ve.start.time.minute);
+    printf("End:\t\t%04d/%02d/%02d %02d.%02d [Z]\n",
+            ve.end.date.year, ve.end.date.month, ve.end.date.day,
+            ve.end.time.hour, ve.end.time.minute);
+    printf("Summary:\t%s\n", ve.summary);
+    printf("Location:\t%s\n", ve.location);
+    printf("Description:\t%s\n", ve.description);
+    printf("Priority:\t%d\n", ve.priority);
+    printf("\n");
+}

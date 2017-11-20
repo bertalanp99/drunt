@@ -64,8 +64,12 @@ DateTime currentDateTime(void);
 
 DateTime addDaysToDateTime(const DateTime, const int);
 
-int monthOverFlows(const int);
+int monthOverflows(const int);
 
-int dayOverFlows(const int, const int);
+int dayOverflows(const int, const int, const int);
+
+void printVEventWCount(const VEvent, const int);
+
+void printVEvent(const VEvent);
 
 #endif
