@@ -9,6 +9,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <assert.h>
+#include <time.h>
 
 #define YEAR_MIN 1950
 #define YEAR_MAX 2050
@@ -596,5 +597,85 @@ int compareVEvent(const VEvent ve1, const VEvent ve2)
             strcmp(ve1.description, ve2.description) == 0   &&
             ve1.priority == ve2.priority
         );
+}
+
+DateTime currentDateTime(void)
+{
+    DateTime dt;
+
+    char* months[] = {
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec"
+    };
+    
+    time_t sinceEpoch = time(NULL);
+    char* formatted = ctime(&sinceEpoch);
+
+    /* ctime output format: 'Www Mmm dd hh mm ss yyyy' | ex gr 'Tue May 26 21:51:03 2015'
+                                                                012345678901234567890123  */
+
+    /* Copy stuff by characters */
+    
+    int position = 0;
+    position = 4; // first thing we're interested in is the month -> unfortunately we have to decode it
+    for (int i = 0; i < 12; ++i)
+    {
+        if ( !strncmp(months[i], formatted + position, 3) )
+        {
+            dt.date.month = i + 1;
+        }
+    }
+
+    position = 8;
+    char day[2] = { formatted[position], formatted[position + 1] };
+    myatoi(day, &dt.date.day);
+
+    position = 11;
+    char hour[2] = { formatted[position], formatted[position + 1] };
+    myatoi(hour, &dt.time.hour);
+
+    position = 14;
+    char min[2]= { formatted[position], formatted[position + 1] };
+    myatoi(min, &dt.time.minute);
+
+    position = 20;
+    myatoi(formatted + position, &dt.date.year);
+
+    return dt;
+}
+
+DateTime addDaysToDateTime(const DateTime from, const int days)
+{
+    DateTime dt = from;
+    for (int i = 0; i < days; ++i)
+    {
+        if (monthOverflows(dt.month))
+        {
+            ++dt.date.year;
+            dt.date.month = 1;
+            dt.date.day = 1;
+        }
+
+        if (dayOverflows(dt.day, dt.month))
+            
+}
+
+int monthOverflows(const int month)
+{
+    return (month > 12);
+}
+
+int dayOverFlows(const int day, const int month)
+{
+    // TODO
 }
 

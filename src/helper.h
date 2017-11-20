@@ -60,4 +60,12 @@ int promptYN(char*, ...);
 
 int compareVEvent(const VEvent, const VEvent);
 
+DateTime currentDateTime(void);
+
+DateTime addDaysToDateTime(const DateTime, const int);
+
+int monthOverFlows(const int);
+
+int dayOverFlows(const int, const int);
+
 #endif

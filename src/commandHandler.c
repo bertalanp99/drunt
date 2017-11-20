@@ -1,5 +1,7 @@
 #include "commandHandler.h"
 
+#include <time.h>
+
 int (*runCommand[])(char**) = {
     &command_help,
     &command_exit,
@@ -445,7 +447,7 @@ int command_create(char** args)
 
             for (int j = 0; j < numberOfOptions; ++j)
             {
-                if ( args[i] && !strcmp(args[i], options[j].opt) || !strcmp(args[i], options[j].opt_short) )
+                if ( args[i] && ( !strcmp(args[i], options[j].opt) || !strcmp(args[i], options[j].opt_short) ) )
                 {
                     switch (options[j].type)
                     {
@@ -526,26 +528,39 @@ int command_create(char** args)
                             if ( !strcmp(options[j].opt, "--summary") )
                             {
                                 ve.summary = tmp;
-                                for (int k = firstWord; k < i; k++)
+                                strcat(ve.summary, args[firstWord] + 1); // first word need not have apostrophe
+                                strcat(ve.summary, " "); // add space between words as intended
+                                for (int k = firstWord + 1; k < i; k++)
                                 {
                                     strcat(ve.summary, args[k]);
+                                    strcat(ve.summary, " "); // add space between words as intended
                                 }
+                                ve.summary[strlen(ve.summary) - 2] = '\0'; // get rid of closing apostrophe and unnecessary space
                             }
                             else if ( !strcmp(options[j].opt, "--location") )
                             {
                                 ve.location = tmp;
+                                strcat(ve.location, args[firstWord] + 1); // first word need not have apostrophe
+                                strcat(ve.location, " "); // add space between words as intended
+                                for (int k = firstWord + 1; k < i; k++)
                                 for (int k = firstWord; k < i; k++)
                                 {
                                     strcat(ve.location, args[k]);
+                                    strcat(ve.location, " "); // add space between words as intended
                                 }
+                                ve.location[strlen(ve.location) - 2] = '\0'; // get rid of closing apostrophe and unnecessary space
                             }
                             else if ( !strcmp(options[j].opt, "--description") )
                             {
                                 ve.description = tmp;
+                                strcat(ve.description, args[firstWord] + 1); // first word need not have apostrophe
+                                strcat(ve.description, " "); // add space between words as intended
                                 for (int k = firstWord; k < i; k++)
                                 {
-                                    strcat(ve.location, args[k]);
+                                    strcat(ve.description, args[k]);
+                                    strcat(ve.description, " "); // add space between words as intended
                                 }
+                                ve.description[strlen(ve.description) - 2] = '\0'; // get rid of closing apostrophe and unnecessary space
                             }
                             break;
                         }
@@ -694,9 +709,118 @@ int command_delete(char** args)
 
 int command_list(char** args)
 {
-    assert(args);
-    shell_say(WARNING, "This command does nothing; it has not been implemented yet.");
+    if (!args[1])
+    {
+        shell_say(ERROR, "Command 'list' needs at least one argument! Check 'help list' for more information!");
+        return 1;
+    }
+    
+    if ( !strcmp(args[1], "year") && args[2] && !args[3] )
+    {
+        int year;
+        if ( !myatoi(args[2], &year) )
+        {
+            shell_say(ERROR, "Failed to convert entered year to number. Expected input such as '2020'");
+            return 1;
+        }
+
+        if ( !isValidYear(year) )
+        {
+            shell_say(ERROR, "The year you entered is invalid. Drunt expects it in YYYY format. Limited from 1950 to 2050!");
+            return 1;
+        }
+
+        shell_say(PROGRESS, "Listing year %04d below...", year);
+
+        // TODO need month lister!
+        return 1;
+    }
+    else if ( !strcmp(args[1], "month") && args[2] && args[3] && !args[4] )
+    {
+        int year;
+        int month;
+        if ( !myatoi(args[2], &year) )
+        {
+            shell_say(ERROR, "Failed to convert entered year to number. Expected input such as '2020'");
+            return 1;
+        }
+
+        if ( !isValidYear(year) )
+        {
+            shell_say(ERROR, "The year you entered is invalid. Drunt expects it in YYYY format. Limited from 1950 to 2050!");
+            return 1;
+        }
+
+        if ( !myatoi(args[3], &month) )
+        {
+            shell_say(ERROR, "Failed to convert entered month to number. Expected input such as '05'");
+            return 1;
+        }
+
+        if ( !isValidMonth(month) )
+        {
+            shell_say(ERROR, "The month you entered is invalid. Drunt expects it in MM format.");
+            return 1;
+        }
+
+        shell_say(PROGRESS, "Listing month %02d of year %04d below...", month, year);
+
+        // TODO list day
+        
+        return 1;
+    }
+    else if ( !strcmp(args[1], "day") && args[2] && !args[3] )
+    {
+        // TODO list day
+    }
+    else if ( !strcmp(args[1], "agenda") )
+    {
+        if ( !args[2] )
+        {
+            // TODO agenda this week
+        }
+        else if ( !args[3] )
+        {
+            int period;
+            if ( !myatoi(args[3], &period) )
+            {
+                shell_say(ERROR, "Number of days passed to 'list agenda' could not be converted to a number! Please check?");
+                return 1;
+            }
+
+
+            DateTime now = currentDateTime();
+            DateTime until = addDaysToDateTime(now, period);
+
+            /* Traverse calendar until first event after 'now' is found */
+            VEventNode* traveller = calendar.first->next;
+            while (traveller != calendar.last && compareDateTime(traveller->ve.start, now) == BEFORE)
+            {
+                traveller = traveller->next;
+            }
+
+            
+
+            /* Keep traversing, but also print events in given period */
+            int sofar = 0;
+            while (traveller != calendar.last && sofar <= period)
+            {
+                ;
+            }                // TODO print event function
+
+            // TODO agenda in period
+        }
+        else
+        {
+            shell_say(ERROR, "Command 'list agenda' got too many arguments! Check 'help agenda' for available options!");
+            return 1;
+        }
+    }
+    else
+    {
+        shell_say(ERROR, "Invalid arguments to 'list'! Check 'help list' for available options!");
+        return 1;
+    }
 
     return 1;
 }
-
