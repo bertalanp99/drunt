@@ -1,20 +1,22 @@
 #include "commandHandler.h"
 
 #include <time.h>
+#include <stdbool.h>
 
-int (*runCommand[])(char**) = {
+bool (*runCommand[])(char**) = {
     &command_help,
-    &command_exit,
-    &command_open,
+    &command_exit, // exit
+    &command_exit, // q
+    &command_load,
     &command_create,
     &command_modify,
     &command_delete,
     &command_list
 };
 
-int command_help(char** args)
+bool command_help(char** args)
 {   
-    if (!args[1])
+    if (args[1] == NULL)
     {
         shell_say(NEUTRAL, "You are currently in interactive mode. The following commands are at your disposal:");
     
@@ -25,28 +27,28 @@ int command_help(char** args)
 
         shell_say(NEUTRAL, "Type 'help <command>' to know more about a certain command");
     }
-    else if (args[1] && !args[2])
+    else if (args[2] == NULL)
     {
-        if ( !strcmp(args[1], "help") )
+        if (strcmp(args[1], "help") == 0)
         {
             shell_say(NEUTRAL, "\tSyntax:\thelp [commnand]");
             shell_say(NEUTRAL, "\tType this command without any arguments to get a list of available commands.");
             shell_say(NEUTRAL, "\tType 'help <command>' to get to know more about <command>. Note that you've just done that");
-            return 1;
+            return true;
         }
-        else if ( !strcmp(args[1], "exit") )
+        else if (strcmp(args[1], "exit") == 0)
         {
             shell_say(NEUTRAL, "\tSyntax:\texit [options]");
             shell_say(NEUTRAL, "\tType this command to exit interactive mode.");
             shell_say(NEUTRAL, "\tDrunt overwrites your last opened iCalendar file upon exiting by default. To change this behaviur, please type 'exit --discard' or 'exit -d'");
             shell_say(NEUTRAL, "\t\tIn this case, you'll be prompted to specify file to write to. You can also skip saving, effectively throwing away your changes");
         }
-        else if ( !strcmp(args[1], "open") )
+        else if (strcmp(args[1], "load") == 0)
         {
-            shell_say(NEUTRAL, "\tSyntax:\topen <path>");
-            shell_say(NEUTRAL, "\tOpen iCalendar/vCalendar files with this option. You will have to specify which calendar to load .ics file into.");
+            shell_say(NEUTRAL, "\tSyntax:\tload <path>");
+            shell_say(NEUTRAL, "\tLoad (open) iCalendar/vCalendar files with this option.");
         }
-        else if ( !strcmp(args[1], "create") )
+        else if (strcmp(args[1], "create") == 0)
         {
             shell_say(NEUTRAL, "\tSyntax:\tcreate [details]");
             shell_say(NEUTRAL, "\tWith this function, you can add a new event to your calendar.");
@@ -73,19 +75,19 @@ int command_help(char** args)
             shell_say(STATUS, "\t\t--priority | -p <text>");
             shell_say(NEUTRAL, "\t\t\tSet prioriy of new event. Priority ranges from 0 to 9. 0 means most important and 9 means least important");
         }
-        else if ( !strcmp(args[1], "modify") )
+        else if (strcmp(args[1], "modify") == 0)
         {
             shell_say(NEUTRAL, "\tSyntax:\tmodify [date]");
             shell_say(NEUTRAL, "\tAs of yet, you can only specify events by their starting date. You can enter date as an argument, but if you don't, you'll be prompted for it anyway");
             shell_say(NEUTRAL, "\t\tPlease note that if you do choose to enter the date, you have to follow iCalendar/vCalendar timestamp format. Check 'help create' for detailed instructions, or read the manual");
         }
-        else if ( !strcmp(args[1], "delete") )
+        else if (strcmp(args[1], "delete") == 0)
         {
             shell_say(NEUTRAL, "\tSyntax:\tdelete [date]");
             shell_say(NEUTRAL, "\tThis command lets you delete events. As of yet, events can only be specified by their starting date. You can either enter date as an argument or give no argument and let interactive mode prompt you.");
             shell_say(NEUTRAL, "\t\tPlease note that if you do choose to enter the date, you have to follow iCalendar/vCalendar timestamp format. Check 'help create' for detailed instructions, or read the manual");
         }
-        else if ( !strcmp(args[1], "list") )
+        else if (strcmp(args[1], "list") == 0)
         {
             shell_say(NEUTRAL, "\tSyntax:\tlist <year | month | day | agenda> [year | month | day | period]");
             shell_say(NEUTRAL, "\tThis is probably the command you are going to use the most. It is used to list events.");
@@ -97,7 +99,7 @@ int command_help(char** args)
         else
         {
             shell_say(ERROR, "Cannot show help for command '%s'. Command does not exist.", args[1]);
-            return 1;
+            return true;
         }
     }
     else
@@ -105,82 +107,73 @@ int command_help(char** args)
         shell_say(ERROR, "Too many arguments passed to 'help'");
     }
 
-    return 1;
+    return true;
 }
 
-int command_exit(char** args)
+bool command_exit(char** args)
 {   
-    if ( !args[1] )
+    if (args[1] == NULL)
     {
         shell_say(PROGRESS, "Saving you calendar into file '%s'...", file);
-        if (file)
+        if (file != NULL)
         {
-            switch( ICS_write(file, &calendar, OVERWRITE) )
+            if ( shell_handleError( ICS_write(file, &calendar, OVERWRITE) ) )
             {
-                case FAIL_FILE_WRITE:
-                    shell_say(ERROR, "Failed to open file %s for writing. Changes will be lost. Sorry!", file);
-                    break;
-
-                default:
-                    break;
+                shell_say(DONE, "Successfully saved calendar! Farewell (• ε •)");
+                return false;
             }
-            shell_say(DONE, "Successfully saved calendar! Farewell (• ε •)");
-            return 0;
+            else
+            {
+                shell_say(ERROR, "Failed to safely exit. Please use option '-d' to forcefully exit drunt and discard any changes");
+                return true;
+            }
         }
-        else // filename is NULL
+        else
         {
             shell_say(STATUS, "For some odd reason, file has been set to a NULL pointer. Where would you like to save your calendar?");
             
-            char buff[BUFFSIZE];
-
-            do
+            if (!shell_handleError( shell_readString(&file, MAX_PATHLENGTH, true) ))
             {
-                shell_say(PROMPT, "Please enter path to file to save into:");
-                fgets(buff, sizeof buff, stdin);
-                if (strlen(buff) >= MAX_PATHLENGTH)
-                {
-                    shell_say(ERROR, "Path is too long. Maxium %d characters allowed. Please try again", MAX_PATHLENGTH);
-                }
+                shell_say(ERROR, "Failed to read path to savefile");
+                return true;
             }
-            while (strlen(buff) >= MAX_PATHLENGTH);
-
-            switch( ICS_write(file, &calendar, OVERWRITE) )
+            else
             {
-                case FAIL_FILE_WRITE:
-                    shell_say(ERROR, "Failed to open file %s for writing. Changes will be lost. Sorry!", file);
-                    break;
-
-                default:
-                    break;
+                shell_say(PROGRESS, "Saving to file %s ...", file);
             }
 
-            return 0;
+            if (!shell_handleError( ICS_write(file, &calendar, OVERWRITE) ))
+            {
+                shell_say("Failed to safely exit. Please use option '-d' to forcefully exit drunt and discard any changes");
+            }
+
+            return false; // EXIT
         }
     }
     else if ( !strcmp(args[1], "--discard") || !strcmp(args[1], "-d") )
     {
         shell_say(WARNING, "About to exit drunt without saving changes! Are you sure?");
-        if (!promptYN("[ ?? ] Exit?"))
+        if (!shell_promptYN("Sure you want to exit?"))
         {
             shell_say(STATUS, "Cancelled exit");
-            return 1;
+            return true;
         }
         else
         {
             shell_say(PROGRESS, "Exiting drunt and ditching changes...");
-            return 0;
+            return false; // EXIT
         }
     }
     else
     {
         shell_say(ERROR, "Invalid argument: %s", args[1]);
-        return 1;
+        return true;
     }
 }
-    
-int command_open(char** args)
+
+bool command_load(char** args)
 {
-    if ( !args[1] )
+    if (args[1] == NULL)
     {
         char buff[BUFFSIZE];
 
@@ -203,7 +196,7 @@ int command_open(char** args)
                     shell_say(ERROR, "Failed to save file!");
                     if ( !promptYN("[ ?? ] Close without saving?") )
                     {
-                        shell_say(STATUS, "Cancelled closing file and opening new");
+                        shell_say(STATUS, "Cancelled closing file and loading new");
                         return 1;
                     }
                     else
@@ -214,7 +207,7 @@ int command_open(char** args)
 
                 default:
                 {
-                    shell_say(STATUS, "Successfully saved open calendar to file '%s'. Moving on to opening other file", file);
+                    shell_say(STATUS, "Successfully saved open calendar to file '%s'. Moving on to loading other file", file);
                     break;
                 }
             }
@@ -280,7 +273,7 @@ int command_open(char** args)
                     shell_say(ERROR, "Failed to save file!");
                     if ( !promptYN("[ ?? ] Close without saving?") )
                     {
-                        shell_say(STATUS, "Cancelled closing file and opening new");
+                        shell_say(STATUS, "Cancelled closing file and loading new");
                         return 1;
                     }
                     else
@@ -291,7 +284,7 @@ int command_open(char** args)
 
                 default:
                 {
-                    shell_say(STATUS, "Successfully saved open calendar to file '%s'. Moving on to opening other file", file);
+                    shell_say(STATUS, "Successfully saved open calendar to file '%s'. Moving on to loading other file", file);
                     break;
                 }
             }
@@ -667,9 +660,12 @@ int command_create(char** args)
                         do
                         {
                             fgets(buff, sizeof buff, stdin);
-                            sscanf(buff, "%d", &ve.priority);
                         }
-                        while ( !isValidPriority(ve.priority) );
+                        while
+                            (
+                                ( sscanf(buff, "%d", &ve.priority) != EOF ) &&
+                                !isValidPriority(ve.priority)
+                            );
                         break;
                     }
                 }
@@ -742,41 +738,80 @@ int command_list(char** args)
     }
     else if ( !strcmp(args[1], "month") && args[2] && args[3] && !args[4] )
     {
-        int year;
-        int month;
-        if ( !myatoi(args[2], &year) )
+        Date month;
+
+        if ( !myatoi(args[2], &month.year) )
         {
             shell_say(ERROR, "Failed to convert entered year to number. Expected input such as '2020'");
             return 1;
         }
 
-        if ( !isValidYear(year) )
+        if ( !isValidYear(month.year) )
         {
             shell_say(ERROR, "The year you entered is invalid. Drunt expects it in YYYY format. Limited from 1950 to 2050!");
             return 1;
         }
 
-        if ( !myatoi(args[3], &month) )
+        if ( !myatoi(args[3], &month.month) )
         {
             shell_say(ERROR, "Failed to convert entered month to number. Expected input such as '05'");
             return 1;
         }
 
-        if ( !isValidMonth(month) )
+        if ( !isValidMonth(month.month) )
         {
             shell_say(ERROR, "The month you entered is invalid. Drunt expects it in MM format.");
             return 1;
         }
 
-        shell_say(PROGRESS, "Listing month %02d of year %04d below...", month, year);
+        month.day = 1;
 
-        // TODO list day
+        shell_say(PROGRESS, "Listing month %02d of year %04d below...", month.month, month.year);
+
+        printMonth(month, &calendar);
         
         return 1;
     }
-    else if ( !strcmp(args[1], "day") && args[2] && !args[3] )
+    else if ( !strcmp(args[1], "day") && args[2] && args[3] && args[4] && !args[5])
     {
-        // TODO list day
+        /* Process input */
+        DateTime tmp;
+        if ( !shell_handleError(parseDateTime(&tmp, args[2], args[3], args[4], "0", "0"), NULL, 0, NULL) )
+        {
+            return 1;
+        }
+        Date day = tmp.date;
+
+        /* Traverse calendar to until given day is reached*/
+        VEventNode* traveller = calendar.first->next;
+        while( traveller != calendar.last && compareDate(traveller->ve.start.date, day) != SAME)
+        {
+            traveller = traveller->next;
+        }
+
+        /* Keep traversing, but also print out events and hour headers */
+        printDayHeader(day);
+        int count = 1;
+        int hour = -1; // initialise to impossible value
+        int isAtNewHour = 1;
+        while ( traveller != calendar.last && compareDate(traveller->ve.start.date, day) == SAME)
+        {
+            if (traveller->ve.start.time.hour != hour)
+            {
+                hour = traveller->ve.start.time.hour;
+                isAtNewHour = 1;
+            }
+            
+            if (isAtNewHour)
+            {
+                printHourHeader(traveller->ve.start.time.hour);
+                isAtNewHour = 0;
+            }
+            
+            printVEventWCount(traveller->ve, count);
+            traveller = traveller->next;
+        }
+
     }
     else if ( !strcmp(args[1], "agenda") ) // TODO create separate functions
     {

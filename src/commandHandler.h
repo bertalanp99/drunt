@@ -21,7 +21,8 @@
 static const char* commands[] = {
     "help",
     "exit",
-    "open",
+    "q",
+    "load",
     "create",
     "modify",
     "delete",
@@ -38,7 +39,7 @@ int command_help(char**);
 
 int command_exit(char**);
 
-int command_open(char**);
+int command_load(char**);
 
 int command_create(char**);
 

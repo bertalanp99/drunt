@@ -1,6 +1,7 @@
 #include "helper.h"
 #include "errorHandler.h"
 #include "enums.h"
+#include "arrays.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,12 +11,14 @@
 #include <stdarg.h>
 #include <assert.h>
 #include <time.h>
+#include <math.h>
 
 #define YEAR_MIN 1950
 #define YEAR_MAX 2050
 
 #define BUFFSIZE 1024
 #define MAX_LINELENGTH 600 // 75 octets
+#define LONGESTPROPERTY "Description"
 
 int isLeapYear(const int year)
 {
@@ -273,16 +276,16 @@ int isValidICSTimeStamp(const char* timestamp)
     // temporarily myatoi() everything and also check their validity
     char buff[8]; // 4+1 would be enough though
     int tmp;
+    int tmpMonth;
 
     return
         (
-            myatoi(mystrncpy(buff, timestamp, 4), &tmp)       && isValidYear(tmp)     &&
-            myatoi(mystrncpy(buff, timestamp + 4, 2), &tmp)   && isValidMonth(tmp)    &&
-            myatoi(mystrncpy(buff, timestamp + 6, 2), &tmp)   && isValidDay(tmp)      &&
-            myatoi(mystrncpy(buff, timestamp + 9, 2), &tmp)   && isValidHour(tmp)     &&
-            myatoi(mystrncpy(buff, timestamp + 11, 2), &tmp)  && isValidMinute(tmp)   &&
-            // TODO deal with seconds?
-            timestamp[15] == 'Z' // TODO only ZULU timestamps supported as of yet
+            myatoi(mystrncpy(buff, timestamp, 4), &tmp)             && isValidYear(tmp)             &&
+            myatoi(mystrncpy(buff, timestamp + 4, 2), &tmpMonth)    && isValidMonth(tmpMonth)       &&
+            myatoi(mystrncpy(buff, timestamp + 6, 2), &tmp)         && isValidDay(tmp, tmpMonth)    &&
+            myatoi(mystrncpy(buff, timestamp + 9, 2), &tmp)         && isValidHour(tmp)             &&
+            myatoi(mystrncpy(buff, timestamp + 11, 2), &tmp)        && isValidMinute(tmp)           &&
+            timestamp[15] == 'Z'
         );
 }
 
@@ -358,9 +361,9 @@ int isValidMonth(const int month)
     return (month >= 1 && month <= 12);
 }
 
-int isValidDay(const int day)
+int isValidDay(const int day, const int month)
 {
-    return (day >=1 && day <= 31);
+    return (day >=1 && day <= monthLength[month - 1]);
 }
 
 int isValidHour(const int hour)
@@ -375,7 +378,7 @@ int isValidMinute(const int minute)
 
 int isValidDate(const Date d)
 {
-    return ( isValidYear(d.year) && isValidMonth(d.month) && isValidDay(d.day) );
+    return ( isValidYear(d.year) && isValidMonth(d.month) && isValidDay(d.day, d.month) );
 }
 
 int isValidTime(const Time t)
@@ -548,7 +551,7 @@ int myatoi(const char* str, int* out) // TODO CREDIT THIS FUNCTION TO "https://s
     return 1;
 }
 
-int promptYN(char* message, ...)
+int promptYN(char* message, ...) // TODO is this needed?
 {
     assert(message != NULL);
 
@@ -706,24 +709,15 @@ int monthOverflows(const int month)
 
 int dayOverflows(const int day, const int month, const int year)
 {
-    int monthLength[12] = {
-        31, // Jan
-        28, // Feb
-        31, // Mar
-        30, // Apr
-        31, // May
-        30, // Jun
-        31, // Jul
-        31, // Aug
-        30, // Sep
-        31, // Oct
-        30, // Nov
-        31, // Dec
-    };
-
     if (isLeapYear(year))
     {
-        monthLength[feb] = 29;
+        if (month == 2)
+        {
+            if (day > 29)
+            {
+                return 1;
+            }
+        }
     }
 
     return (day > monthLength[month - 1]);
@@ -731,32 +725,212 @@ int dayOverflows(const int day, const int month, const int year)
 
 void printVEventWCount(const VEvent ve, const int no)
 {
+    int width = strlen(LONGESTPROPERTY) + 1;
+    
     printf("\n| VEVENT %02d |\n", no);
-    printf("Start:\t\t%04d/%02d/%02d %02d.%02d [Z]\n",
+    printf("%*s %04d/%02d/%02d %02d.%02d [Z]\n",
+            width, "Start:",
             ve.start.date.year, ve.start.date.month, ve.start.date.day,
             ve.start.time.hour, ve.start.time.minute);
-    printf("End:\t\t%04d/%02d/%02d %02d.%02d [Z]\n",
+    printf("%*s %04d/%02d/%02d %02d.%02d [Z]\n",
+            width, "End:",
             ve.end.date.year, ve.end.date.month, ve.end.date.day,
             ve.end.time.hour, ve.end.time.minute);
-    printf("Summary:\t%s\n", ve.summary);
-    printf("Location:\t%s\n", ve.location);
-    printf("Description:\t%s\n", ve.description);
-    printf("Priority:\t%d\n", ve.priority);
+    printf("%*s %s\n", width, "Summary:", ve.summary);
+    printf("%*s %s\n", width, "Location:", ve.location);
+    printf("%*s %s\n", width, "Description:", ve.description);
+    printf("%*s %d\n", width, "Priority:", ve.priority);
     printf("\n");
 }
 
 void printVEvent(const VEvent ve)
 {
+    int width = strlen(LONGESTPROPERTY);
+    
     printf("\n| VEVENT |\n");
-    printf("Start:\t\t%04d/%02d/%02d %02d.%02d [Z]\n",
+    printf("%*s %04d/%02d/%02d %02d.%02d [Z]\n",
+            width, "Start:",
             ve.start.date.year, ve.start.date.month, ve.start.date.day,
             ve.start.time.hour, ve.start.time.minute);
-    printf("End:\t\t%04d/%02d/%02d %02d.%02d [Z]\n",
+    printf("%*s %04d/%02d/%02d %02d.%02d [Z]\n",
+            width, "End:",
             ve.end.date.year, ve.end.date.month, ve.end.date.day,
             ve.end.time.hour, ve.end.time.minute);
-    printf("Summary:\t%s\n", ve.summary);
-    printf("Location:\t%s\n", ve.location);
-    printf("Description:\t%s\n", ve.description);
-    printf("Priority:\t%d\n", ve.priority);
+    printf("%*s %s\n", width, "Summary:", ve.summary);
+    printf("%*s %s\n", width, "Location:", ve.location);
+    printf("%*s %s\n", width, "Description", ve.description);
+    printf("%*s %d\n", width, "Priority:", ve.priority);
+    printf("\n");
+}
+
+MYERRNO parseDateTime(DateTime* dest, const char* year, const char* month, const char* day, const char* hour, const char* minute)
+{
+    assert( year && month && day && hour && minute );
+    if
+        (
+            !myatoi(year, &dest->date.year)      ||
+            !myatoi(month, &dest->date.month)    ||
+            !myatoi(day, &dest->date.day)        ||
+            !myatoi(hour, &dest->time.hour)      ||
+            !myatoi(minute, &dest->time.minute)
+        )
+    {
+        return FAIL_MYATOI;
+    }
+
+    if ( !isValidYear(dest->date.year) )
+    {
+        return FAIL_INVALID_YEAR;
+    }
+    else if ( !isValidMonth(dest->date.month) )
+    {
+        return FAIL_INVALID_MONTH;
+    }
+    else if ( !isValidDay(dest->date.day, dest->date.month) )
+    {
+        return FAIL_INVALID_DAY;
+    }
+    else if ( !isValidHour(dest->time.hour) )
+    {
+        return FAIL_INVALID_HOUR;
+    }
+    else if ( !isValidMinute(dest->time.minute) )
+    {
+        return FAIL_INVALID_MINUTE;
+    }
+
+    return SUCCESS;
+}
+
+void printDayHeader(const Date day)
+{
+    assert(isValidDate(day));
+
+    printf("\n");
+    printf("<-------------------->\n");
+    printf("<---< %04d/%02d/%02d >--->\n", day.year, day.month, day.day);
+    printf("<-------------------->\n");
+    printf("\n");
+}
+
+void printMonthHeader(const Date month)
+{
+    assert(isValidDate(month));
+
+    printf("\n");
+    printf("<----------------->\n");
+    printf("<---< %04d/%02d >--->\n", month.year, month.month);
+    printf("<----------------->\n");
+    printf("\n");
+}
+
+void printHourHeader(const int hour)
+{
+    assert(isValidHour(hour));
+
+    printf("<--- %02d h --->\n", hour);
+}
+
+void printSep(const int n)
+{
+    for (int i = 0; i < n; ++i)
+    {
+        putchar('-');
+    }
+    putchar('\n');
+}
+
+int zellerToISO(const Date day)
+{
+    // check for incorrect parameters
+    assert(isValidDate(day));
+
+    /* Zeller's original congruence:
+     * h = ( q + FLOOR((13(m+1))/(5)) + K + FLOOR(K/4) + FLOOR(J/4) - 2J ) % 7
+     * 
+     * Zeller's congruence modified:
+     * 
+     * h = ( q + FLOOR((13(m+1))/(5)) + K + FLOOR(K/4) + FLOOR(J/4) + 5J ) % 7
+     *
+     * where...
+     *  h = day of week (0 -> SAT, 1 -> SUN, ..., 6 -> FRI)
+     *  q = day of month
+     *  m = month (3 -> MAR, 4 -> APR, ..., 14 -> FEB)
+     *  K = year % 100
+     *  J = FLOOR(year / 100)
+     *
+     * to convert h to an ISO week date where 1 means MON and 7 means SUN:
+     *  d = ( (h + 5) % 7 ) + 1
+     */
+
+    int d; // future return value
+    int h;
+    int q = day.day;
+    int m = (day.month > 2) ? day.month : (day.month + 2);
+    int K = (day.year % 100);
+    int J = (day.year / 100);
+    
+    h = ((q + (13*(m+1))/(5) + K + K/4 + J/4 - 2*J ) % 7);
+    d = (( (h+5) % 7) + 1);
+    
+    return d;
+}
+
+void printMonth(Date month, const Calendar* cal)
+{
+    assert(isValidDate(month));
+    month.day = 1;
+    
+    printMonthHeader(month);
+
+    int firstDay = zellerToISO(month);
+
+    int leadingSpaces = firstDay - 1;
+
+    char days[7] = {'M', 'T', 'W', 'T', 'F', 'S', 'S'};
+
+    for (int i = 0; i < 7; ++i)
+    {
+        printf("%2c", days[i]);
+        printf(" ");
+    }
+
+    printf("\n");
+    printSep( (7*2) + 7 - 1);
+    
+    for (int i = 0; i < leadingSpaces; ++i)
+    {
+        printf("  "); // leave day blank
+        printf(" "); // space between events
+    }
+
+    VEventNode* traveller = cal->first->next;
+    while (traveller != cal->last && compareDate(traveller->ve.start.date, month) == BEFORE) // traverse calendar until month
+    {
+        traveller = traveller->next;
+    }
+    
+    for (int i = 1, j = 1; i <= monthLength[month.month - 1]; ++i)
+    {
+        printf("%2d", i);
+        printf(" ");
+        
+        if ((i + leadingSpaces) % 7 == 0)
+        {
+            printf("\n");
+            while (traveller != cal->last && j <= i)
+            {
+                if (traveller->ve.start.date.day == j++)
+                {
+                    printf("X");
+                }
+                //itraveller = traveller->next;
+                //
+                //TODO finish 
+            }
+            printf("\n");
+        }
+    }
+
     printf("\n");
 }

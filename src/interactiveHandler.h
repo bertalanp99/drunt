@@ -6,12 +6,14 @@
 #include "dbHandler.h"
 #include "commandHandler.h"
 #include "arrays.h"
+#include "enums.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
 #include <stdarg.h>
+#include <stdbool.h>
 
 #define MAX_PATHLENGTH 128
 #define DEFAULTFILE "calendar.ics"
@@ -36,14 +38,20 @@ char* shell_readline(void);
 
 char** shell_splitline(char*);
 
-int shell_execute(char**);
+bool shell_execute(char**);
 
 void shell(void);
 
 void shell_say(ShellSays, const char*, ...);
 
-int shell_readTimeStamp(DateTime*, TIMESTAMPTYPE);
+bool shell_readTimeStamp(DateTime*, TIMESTAMPTYPE);
 
-int shell_readString(char**);
+MYERRNO shell_readString(char**, const size_t, const bool (*)(char*));
+
+MYERRNO shell_readNum(int*, const bool (*)(int));
+
+bool shell_promptYN(char*, ...);
+
+bool shell_handleError(const MYERRNO, const char*, const int, const char*);
 
 #endif

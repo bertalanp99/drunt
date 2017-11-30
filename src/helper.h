@@ -30,7 +30,7 @@ int isValidYear(const int);
 
 int isValidMonth(const int);
 
-int isValidDay(const int);
+int isValidDay(const int, const int);
 
 int isValidHour(const int);
 
@@ -71,5 +71,17 @@ int dayOverflows(const int, const int, const int);
 void printVEventWCount(const VEvent, const int);
 
 void printVEvent(const VEvent);
+
+MYERRNO parseDateTime(DateTime*, const char*, const char*, const char*, const char*, const char*);
+
+void printDayHeader(const Date);
+
+void printMonthHeader(const Date);
+
+void printHourHeader(const int);
+
+int zellerToISO(const Date);
+
+void printMonth(Date, const Calendar*);
 
 #endif
