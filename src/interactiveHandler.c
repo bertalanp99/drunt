@@ -3,9 +3,9 @@
 #define YEAR_MIN 1950
 #define YEAR_MAX 2050
 
-///////////////////////////////////////////////////////////////////////////////////////////
-// This was made following tutorial on https://brennan.io/2015/01/16/write-a-shell-in-c/ //
-///////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////
+// The 'shell' was made following tutorial on https://brennan.io/2015/01/16/write-a-shell-in-c/ //
+//////////////////////////////////////////////////////////////////////////////////////////////////
 
 void shell(void)
 {
@@ -23,35 +23,10 @@ void shell(void)
     
     /* Startup actions */
     shell_say(PROGRESS, "Loading default iCalendar (%s)...", DEFAULTFILE);
-    switch (ICS_load(DEFAULTFILE, &calendar))
-    {
-        case FAIL_FILE_CORRUPT:
-            shell_say(WARNING, "Failed to load default iCalendar %s; file is either corrupt or does not exist", DEFAULTFILE);
-            break;
-
-        case FAIL_FILE_READ:
-            shell_say(WARNING, "Failed to open default iCalendar %s; unable to open file for reading (it proably does not exist)", DEFAULTFILE);
-            break;
-
-        case FAIL_TIMESTAMP_CORRUPT:
-            shell_say(ERROR, "Default iCalendar file %s contains corrupt timestamp. File has not been loaded", DEFAULTFILE);
-            break;
-
-        case FAIL_MALLOC:
-            shell_say(ERROR, "Unable to allocate memory for default iCalendar. File has not been loaded.", DEFAULTFILE);
-            break;
-
-        case FAIL_OVERFLOW:
-            shell_say(ERROR, "Default iCalendar file %s contains overflow. File has not been loaded", DEFAULTFILE);
-            break;
-
-        default:
-            shell_say(DONE, "Successfully loaded default iCalendar (%s)!", DEFAULTFILE);
-            break;
-    }
+    shell_handleError(ICS_load(DEFAULTFILE, &calendar), DEFAULTFILE, 0, NULL);
 
     putchar('\n');
-    shell_say(STATUS, "Welcome to drunt! Please enter 'help' if you are new around here ^( '‿' )^");
+    shell_say(STATUS, "Welcome to drunt! Please enter 'help' if you are new ^( '‿' )^");
     
     /* Shell handling */
     char* line;
@@ -67,7 +42,7 @@ void shell(void)
         args = shell_splitline(line);
         status = shell_execute(args);
 
-        // freeing dynamic arrays every time
+        // freeing dynamic arrays each time
         free(line);
         free(args);
     }
@@ -78,32 +53,14 @@ void shell(void)
 
 char* shell_readline(void)
 {
-    char buff[BUFFSIZE];
-    
-    do
-    { // keep reading until valid line is read
-        fgets(buff, sizeof buff, stdin);
-        if (strlen(buff) >= MAX_COMMANDLENGTH)
-        {
-            shell_say(ERROR, "Command entered is too long. Maximum %d characters allowed.", MAX_COMMANDLENGTH);
-        }
-    }
-    while (strlen(buff) >= MAX_COMMANDLENGTH);
-
-    char* line = malloc( sizeof(char) * (strlen(buff) + 1) );
-    if (line == NULL)
-    {
-        shell_say(ERROR, "Fatal error: failed to allocate memory");
-        die("Failed to allocate memory for command string");
-    }
-
-    strcpy(line, buff);
+    char* line;
+    shell_handleError(shell_readString(&line, MAX_COMMANDLENGTH), NULL, 0, line);
     
     return line;
 }
 
 char** shell_splitline(char* line)
-{   
+{
     assert(line != NULL);
     
     /* Allocate memory for command arguments */
@@ -139,6 +96,8 @@ char** shell_splitline(char* line)
 
 bool shell_execute(char** args)
 {
+    assert(args != NULL);
+
     /* First, handle empty command */
     if (args[0] == NULL)
     {
@@ -146,12 +105,12 @@ bool shell_execute(char** args)
     }
 
     /* Handle other commands */
-    size_t nOfCommands = ( sizeof commands / sizeof(char*) );
-    for (int i = 0; i < nOfCommands; ++i)
+    size_t numbereOfCommands = ( sizeof commands / sizeof(char*) );
+    for (int i = 0; i < numberOfCommands; ++i)
     {
         if ( strcmp(args[0], commands[i]) == 0 )
         {
-            return (*runCommand[i])(args);
+            return shell_handleError((*runCommand[i])(args), NULL, 0, NULL);
         }
     }
 
@@ -161,6 +120,8 @@ bool shell_execute(char** args)
 
 void shell_say(ShellSays ss, const char* message, ...)
 {
+    assert(message != NULL);
+
     /* Handle parameters */
     char buff[BUFFSIZE];
     va_list args;
@@ -208,31 +169,12 @@ void shell_say(ShellSays ss, const char* message, ...)
     }
 }
 
-bool shell_readTimeStamp(DateTime* dt, TIMESTAMPTYPE tt)
+MYERRNO shell_readTimestamp(DateTime* dt, TimestampType tt)
 {
-    char* type;
-    switch (tt)
-    {
-        case DTSTART:
-        {
-            type = "STARTING";
-            break;
-        }
+    assert(dt != NULL);
 
-        case DTEND:
-        {
-            type = "ENDING";
-            break;
-        }
-
-        default:
-        {
-            break; // impossible case
-        }
-    }
-
+    char* type = (tt == DTSTART) ? "STARTING" : "ENDING";
     char buff[BUFFSIZE];
-        
     bool done = true;
 
     do
@@ -243,8 +185,7 @@ bool shell_readTimeStamp(DateTime* dt, TIMESTAMPTYPE tt)
             if ( fgets(buff, sizeof buff, stdin) == NULL)
             {
                 putchar('\n');
-                shell_say(WARNING, "Received EOF, cancelling...");
-                return false;
+                return FAIL_EOF;
             }
 
             if (
@@ -258,7 +199,7 @@ bool shell_readTimeStamp(DateTime* dt, TIMESTAMPTYPE tt)
                 done = false;
             }
             else
-            {
+            { // TODO generic
                 if (!isValidYear(dt->date.year))
                 {
                     shell_say(ERROR, "Invalid input for year: %04d", dt->date.year);
@@ -291,11 +232,13 @@ bool shell_readTimeStamp(DateTime* dt, TIMESTAMPTYPE tt)
     }
     while (!done);
 
-    return true;
+    return SUCCESS;
 }
 
-MYERRNO shell_readString(char** str, const size_t maxLength, const bool (*condition)(char*))
+MYERRNO shell_readString(char** str, const size_t maxLength)
 {
+    assert (str != NULL && maxLength != 0);
+
     char buff[BUFFSIZE];
 
     do
@@ -303,7 +246,6 @@ MYERRNO shell_readString(char** str, const size_t maxLength, const bool (*condit
         if (fgets(buff, sizeof buff, stdin) == NULL)
         {
             putchar('\n');
-            shell_say(WARNING, "Received EOF, cancelling...");
             return FAIL_EOF;
         }
         
@@ -313,7 +255,7 @@ MYERRNO shell_readString(char** str, const size_t maxLength, const bool (*condit
             shell_say(ERROR, "Entered string is too long. Please enter a maximum of %d characters.", maxLength);
         }
     }
-    while (strlen(buff)  > maxLength && !condition(buff));
+    while (strlen(buff)  > maxLength);
 
     char* tmp = malloc( sizeof(char) * (strlen(buff) + 1) );
     if (tmp == NULL)
@@ -328,8 +270,10 @@ MYERRNO shell_readString(char** str, const size_t maxLength, const bool (*condit
     return SUCCESS;
 }
 
-MYERRNO shell_readNum(int* n, const bool (*condition)(int))
+MYERRNO shell_readNum(int* n)
 {
+    assert(n != NULL);
+
     char buff[BUFFSIZE];
 
     do
@@ -343,11 +287,7 @@ MYERRNO shell_readNum(int* n, const bool (*condition)(int))
 
         removeNewLineChar(buff);
     }
-    while
-        (
-            ( sscanf(buff, "%d", &n ) != EOF ) &&
-            !condition(*n)
-        );
+    while(sscanf(buff, "%d", &n ) != EOF);
         
     return SUCCESS;
 }
@@ -380,9 +320,11 @@ bool shell_promptYN(char* message, ...) // TODO is this needed?
         switch (response)
         {
             case 'y':
+            case 'Y':
                 return true;
 
             case 'n':
+            case 'N':
                 return false;
 
             default:
@@ -395,6 +337,7 @@ bool shell_promptYN(char* message, ...) // TODO is this needed?
 
 bool shell_handleError(const MYERRNO error, const char* file, const int line, const char* content)
 {
+    // no assertion --> this function can receive NULL pointers on purpose
     switch (error)
     {
         case FAIL_UNDERFLOW:

@@ -44,11 +44,11 @@ int isValidDateTime(const DateTime);
 
 int isValidVEvent(const VEvent);
 
-RELATIVEDATE compareDateTime(const DateTime, const DateTime);
+RelativeDate compareDateTime(const DateTime, const DateTime);
 
-RELATIVEDATE compareDate(const Date, const Date);
+RelativeDate compareDate(const Date, const Date);
 
-RELATIVEDATE compareTime(const Time, const Time);
+RelativeDate compareTime(const Time, const Time);
 
 void removeNewLineChar(char*);
 

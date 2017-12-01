@@ -44,11 +44,11 @@ void shell(void);
 
 void shell_say(ShellSays, const char*, ...);
 
-bool shell_readTimeStamp(DateTime*, TIMESTAMPTYPE);
+MYERRNO shell_readTimestamp(DateTime*, TimestampType);
 
-MYERRNO shell_readString(char**, const size_t, const bool (*)(char*));
+MYERRNO shell_readString(char**, const size_t);
 
-MYERRNO shell_readNum(int*, const bool (*)(int));
+MYERRNO shell_readNum(int*);
 
 bool shell_promptYN(char*, ...);
 

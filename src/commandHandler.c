@@ -3,10 +3,9 @@
 #include <time.h>
 #include <stdbool.h>
 
-bool (*runCommand[])(char**) = {
+int (*runCommand[])(char**) = {
     &command_help,
-    &command_exit, // exit
-    &command_exit, // q
+    &command_exit,
     &command_load,
     &command_create,
     &command_modify,
@@ -14,11 +13,11 @@ bool (*runCommand[])(char**) = {
     &command_list
 };
 
-bool command_help(char** args)
+int command_help(char** args) // there isn't really a way to shorten this, sorry
 {   
     if (args[1] == NULL)
     {
-        shell_say(NEUTRAL, "You are currently in interactive mode. The following commands are at your disposal:");
+        shell_say(NEUTRAL, "The following commands are at your disposal:");
     
         for (int i = 0; i < numberOfCommands; ++i)
         {
@@ -34,7 +33,7 @@ bool command_help(char** args)
             shell_say(NEUTRAL, "\tSyntax:\thelp [commnand]");
             shell_say(NEUTRAL, "\tType this command without any arguments to get a list of available commands.");
             shell_say(NEUTRAL, "\tType 'help <command>' to get to know more about <command>. Note that you've just done that");
-            return true;
+            return 1;
         }
         else if (strcmp(args[1], "exit") == 0)
         {
@@ -99,7 +98,7 @@ bool command_help(char** args)
         else
         {
             shell_say(ERROR, "Cannot show help for command '%s'. Command does not exist.", args[1]);
-            return true;
+            return 1;
         }
     }
     else
@@ -107,47 +106,47 @@ bool command_help(char** args)
         shell_say(ERROR, "Too many arguments passed to 'help'");
     }
 
-    return true;
+    return 1;
 }
 
-bool command_exit(char** args)
+int command_exit(char** args)
 {   
     if (args[1] == NULL)
     {
         shell_say(PROGRESS, "Saving you calendar into file '%s'...", file);
         if (file != NULL)
         {
-            if ( shell_handleError( ICS_write(file, &calendar, OVERWRITE) ) )
+            if ( shell_handleError( ICS_write(file, &calendar, OVERWRITE), file, 0, NULL ) )
             {
                 shell_say(DONE, "Successfully saved calendar! Farewell (• ε •)");
-                return false;
+                return 0; // EXIT
             }
             else
             {
                 shell_say(ERROR, "Failed to safely exit. Please use option '-d' to forcefully exit drunt and discard any changes");
-                return true;
+                return 1;
             }
         }
         else
         {
             shell_say(STATUS, "For some odd reason, file has been set to a NULL pointer. Where would you like to save your calendar?");
             
-            if (!shell_handleError( shell_readString(&file, MAX_PATHLENGTH, true) ))
+            if (!shell_handleError( shell_readString(&file, MAX_PATHLENGTH) , file, 0, NULL))
             {
                 shell_say(ERROR, "Failed to read path to savefile");
-                return true;
+                return 1;
             }
             else
             {
                 shell_say(PROGRESS, "Saving to file %s ...", file);
             }
 
-            if (!shell_handleError( ICS_write(file, &calendar, OVERWRITE) ))
+            if (!shell_handleError( ICS_write(file, &calendar, OVERWRITE), file, 0, NULL ))
             {
-                shell_say("Failed to safely exit. Please use option '-d' to forcefully exit drunt and discard any changes");
+                shell_say(ERROR, "Failed to safely exit. Please use option '-d' to forcefully exit drunt and discard any changes");
             }
 
-            return false; // EXIT
+            return 0; // EXIT
         }
     }
     else if ( !strcmp(args[1], "--discard") || !strcmp(args[1], "-d") )
@@ -156,205 +155,107 @@ bool command_exit(char** args)
         if (!shell_promptYN("Sure you want to exit?"))
         {
             shell_say(STATUS, "Cancelled exit");
-            return true;
+            return 1;
         }
         else
         {
             shell_say(PROGRESS, "Exiting drunt and ditching changes...");
-            return false; // EXIT
+            return 0; // EXIT
         }
     }
     else
     {
         shell_say(ERROR, "Invalid argument: %s", args[1]);
-        return true;
+        return 1;
     }
 }
 
-bool command_load(char** args)
+int command_load(char** args)
 {
+    /* Check if there's an already loaded file */
+    if (file)
+    {
+        shell_say(PROGRESS, "Saving currently open iCalendar '%s' to disk...", file);
+        if (!shell_handleError( ICS_write(file, &calendar, OVERWRITE), file, 0, NULL ))
+        {
+            if ( !shell_promptYN("Failed to save. Close without saving?") )
+            {
+                shell_say(STATUS, "Cancelled operation");
+                return 1;
+            }
+        }
+        else
+        {
+            shell_say(STATUS, "Successfully saved open calendar to file '%s'. Moving on to loading other file", file);
+        }
+    }
+
+    char* path; // path to file to load
+
+    /* NO ARGUMENTS PASSED --> attempt to query user */
     if (args[1] == NULL)
     {
-        char buff[BUFFSIZE];
-
-        shell_say(PROMPT, "Please enter path to file:");
-        fgets(buff, sizeof buff, stdin);
-        removeNewLineChar(buff);
-        if (strlen(buff) >= MAX_PATHLENGTH)
+        char* path;
+        if (!shell_handleError( shell_readString(&path, MAX_PATHLENGTH), path, 0, NULL ))
         {
-            shell_say(ERROR, "Path is too long. Can't open that. You could try moving your file somewhere else");
             return 1;
         }
-
-        if ( file )
-        {
-            shell_say(PROGRESS, "Saving currently open iCalendar '%s' to disk...", file);
-            switch ( ICS_write(file, &calendar, OVERWRITE) )
-            {
-                case FAIL_FILE_WRITE:
-                {
-                    shell_say(ERROR, "Failed to save file!");
-                    if ( !promptYN("[ ?? ] Close without saving?") )
-                    {
-                        shell_say(STATUS, "Cancelled closing file and loading new");
-                        return 1;
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-
-                default:
-                {
-                    shell_say(STATUS, "Successfully saved open calendar to file '%s'. Moving on to loading other file", file);
-                    break;
-                }
-            }
-        }
-
-        // reinit calendar
-        Calendar_destroy(&calendar);
-        Calendar_create(&calendar);
-
-        shell_say(PROGRESS, "Loading iCalendar file %s into RAM...", buff);
-
-        switch( ICS_load(buff, &calendar) )
-        {
-            case FAIL_FILE_CORRUPT:
-                shell_say(ERROR, "File %s is corrupt/invalid or simply does not exist. The file has not been loaded.", buff);
-                return 1;
-                break;
-            
-            case FAIL_FILE_READ:
-                shell_say(ERROR, "Unable to open file %s for reading. The file has not been loaded.", buff);
-                return 1;
-                break;
-            
-            case FAIL_TIMESTAMP_CORRUPT:
-                shell_say(ERROR, "File %s contains corrupt timestamp. The file has not been loaded.", buff);
-                return 1;
-                break;
-
-            case FAIL_MALLOC:
-                shell_say(ERROR, "Fatal error: failed to allocate memory");
-                die("Failed to allocate memory for calendar. Quitting...");
-                break;
-
-            case FAIL_OVERFLOW:
-                shell_say(ERROR, "File %s contains overflow. The file has not been loaded.", buff);
-                return 1;
-                break;
-
-            default:
-                break;
-        }
-
-        char* tmp = realloc(file, sizeof(char) * (strlen(buff) + 1) );
-        if (!tmp)
-        {
-            shell_say(ERROR, "Failed to allocate memory for new filename! This can lead to all sorts of errors. It is STROGLY advised to exit and try again");
-            return 1;
-        }
-        file = tmp;
-        strcpy(file, buff);
-        shell_say(DONE, "File %s has been successfully loaded!", buff);
-        return 1;
     }
-    else if ( args[1] && !args[2] )
+    /* ONE ARGUMENT PASSED --> use path passed as argument */
+    else if (args[2] == NULL)
     {
-        if ( file )
-        {
-            shell_say(PROGRESS, "Saving currently open iCalendar '%s' to disk...", file);
-            switch ( ICS_write(file, &calendar, OVERWRITE) )
-            {
-                case FAIL_FILE_WRITE:
-                {
-                    shell_say(ERROR, "Failed to save file!");
-                    if ( !promptYN("[ ?? ] Close without saving?") )
-                    {
-                        shell_say(STATUS, "Cancelled closing file and loading new");
-                        return 1;
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-
-                default:
-                {
-                    shell_say(STATUS, "Successfully saved open calendar to file '%s'. Moving on to loading other file", file);
-                    break;
-                }
-            }
-        }
-
-        // reinit calendar
-        Calendar_destroy(&calendar);
-        Calendar_create(&calendar);
-        
-        shell_say(PROGRESS, "Loading iCalendar file %s into RAM...", args[1]);
-
-        switch( ICS_load(args[1], &calendar) )
-        {
-            case FAIL_FILE_CORRUPT:
-                shell_say(ERROR, "File %s is corrupt/invalid or simply just does not exist. The file has not been loaded.", args[1]);
-                return 1;
-                break;
-            
-            case FAIL_FILE_READ:
-                shell_say(ERROR, "Unable to open file %s for reading. The file has not been loaded.", args[1]);
-                return 1;
-                break;
-            
-            case FAIL_TIMESTAMP_CORRUPT:
-                shell_say(ERROR, "File %s contains corrupt timestamp. The file has not been loaded.", args[1]);
-                return 1;
-                break;
-
-            case FAIL_MALLOC:
-                shell_say(ERROR, "Fatal error: failed to allocate memory");
-                die("Failed to allocate memory for calendar. Quitting...");
-                break;
-
-            case FAIL_OVERFLOW:
-                shell_say(ERROR, "File %s contains overflow. The file has not been loaded.", args[1]);
-                return 1;
-                break;
-
-            default:
-                break;
-        }
-
-        char* tmp = realloc(file, sizeof(char) * (strlen(args[1]) + 1) );
-        if (!tmp)
-        {
-            shell_say(ERROR, "Failed to allocate memory for new filename! This can lead to all sorts of errors. It is STROGLY advised to exit and try again");
-            return 1;
-        }
-        file = tmp;
-        strcpy(file, args[1]);
-        
-        shell_say(DONE, "File %s has been successfully loaded!", args[1]);
-        return 1;
+        path = args[1];
     }
+    /* TOO MANY ARGUMENTS PASSED --> cancel */
     else
     {
         shell_say(ERROR, "Too many arguments passed!");
         return 1;
     }
+    
+    /* Reinit calendar */
+    Calendar_destroy(&calendar);
+    Calendar_create(&calendar);
+
+    /* Load ICS from file */
+    shell_say(PROGRESS, "Loading iCalendar file %s into RAM...", path);
+    if (!shell_handleError( ICS_load(path, &calendar), path, 0, NULL ))
+    {
+        shell_say(ERROR, "An error has occured while loading file. Will attempt to reload previous file (%s) now", file);
+        if (!shell_handleError( ICS_load(file, &calendar), file, 0, NULL))
+        {
+            shell_say(ERROR, "An error has occrured while reloading previus file. Will set file path to NULL. Please note that you are basically in demo mode until you load a file");
+            file = NULL;
+            return 1;
+        }
+        else
+        {
+            shell_say(STATUS, "Successfully reloaded file %s", file);
+        }
+    }
+    
+    /* Set file path to new path */
+    char* tmp = realloc(file, sizeof(char) * (strlen(path) + 1) );
+    if (tmp == NULL)
+    {
+        shell_say(ERROR, "Failed to allocate memory for new filename! Will set file path to NULL to prevent overwriting files by accident. Please note that you are basically in demo mode from now on, until you load a file");
+        file = NULL;
+        return 1;
+    }
+    file = tmp;
+    strcpy(file, path);
+    return 1;
 }
 
 int command_create(char** args)
 {
-    /* First, check whether there's an open file */
-    if (!file)
+    /* Check file path */
+    if (file == NULL)
     {
-        shell_say(WARNING, "No file has been opened yet; you are editing an empty calendar.");
-        if (!promptYN("[ ?? ] Continue?")) // TODO better
+        shell_say(WARNING, "It seems like no file has been opened yet: you are editing an empty calendar.");
+        if (!shell_promptYN("Continue?"))
         {
-            shell_say(STATUS, "No event created");
+            shell_say(STATUS, "Cancelled creating event");
             return 1;
         }
     }
@@ -373,140 +274,95 @@ int command_create(char** args)
         .priority = 10
     };
     
-    /* NO ARGUMENTS PASSED */
-    if (!args[1])
-    {
-        /* Read event details one by one */
-        
-        if ( !shell_readTimeStamp(&ve.start, DTSTART) )
+    /* NO ARGUMENTS PASSED --> Query user for each detail */
+    if (args[1] == NULL)
+    {   
+        if
+            (
+                !shell_handleError( shell_readTimestamp(&ve.start, DTSTART),            NULL, 0, NULL ) ||
+                !shell_handleError( shell_readTimestamp(&ve.end, DTEND),                NULL, 0, NULL ) ||
+                !shell_handleError( shell_readString(&ve.summary, MAX_LINELENGTH),      NULL, 0, NULL ) ||
+                !shell_handleError( shell_readString(&ve.location, MAX_LINELENGTH),     NULL, 0, NULL ) ||
+                !shell_handleError( shell_readString(&ve.description, MAX_LINELENGTH),  NULL, 0, NULL ) ||
+                !shell_handleError( shell_readNum(&ve.priority),                        NULL, 0, NULL )
+            )
         {
             return 1;
         }
-         
-        if ( !shell_readTimeStamp(&ve.end, DTEND) )
-        {
-            return 1;
-        }
-        
-        shell_say(PROMPT, "Event summary:");
-        if ( !shell_readString(&ve.summary) )
-        {
-            return 1;
-        }
-         
-        shell_say(PROMPT, "Event location:");
-        if ( !shell_readString(&ve.location) )
-        {
-            return 1;
-        }
-        
-        shell_say(PROMPT, "Event description:");
-        if ( !shell_readString(&ve.description) )
-        {
-            return 1;
-        }
-
-        shell_say(PROMPT, "Event priority:");
-        
-        char buff[BUFFSIZE];
-
-        do
-        {
-            fgets(buff, sizeof buff, stdin);
-            sscanf(buff, "%d", &ve.priority);
-        }
-        while ( !isValidPriority(ve.priority) );
     }
-    
     /* THERE IS AT LEAST ONE ARGUMENT PASSED */
     else
     {
+        // temporary structure
         typedef struct {
             char* opt;
             char* opt_short;
-            ICSDATATYPE type;
-            int flag;
+            ICSDataType type;
+            bool flag;
         } Option;
         
+        // temporary array of option structure
         Option options[] = {
-            { .opt = "--begin",         .opt_short = "-b", .type = TIMESTAMP,   .flag = 0 },
-            { .opt = "--end",           .opt_short = "-e", .type = TIMESTAMP,   .flag = 0 },
-            { .opt = "--summary",       .opt_short = "-s", .type = STRING,      .flag = 0 },
-            { .opt = "--location",      .opt_short = "-l", .type = STRING,      .flag = 0 },
-            { .opt = "--description",   .opt_short = "-d", .type = STRING,      .flag = 0 },
-            { .opt = "--priority",      .opt_short = "-p", .type = NUMBER,      .flag = 0 }
+            { .opt = "--begin",         .opt_short = "-b", .type = TIMESTAMP,   .flag = false },
+            { .opt = "--end",           .opt_short = "-e", .type = TIMESTAMP,   .flag = false },
+            { .opt = "--summary",       .opt_short = "-s", .type = STRING,      .flag = false },
+            { .opt = "--location",      .opt_short = "-l", .type = STRING,      .flag = false },
+            { .opt = "--description",   .opt_short = "-d", .type = STRING,      .flag = false },
+            { .opt = "--priority",      .opt_short = "-p", .type = NUMBER,      .flag = false }
         };
-        
         size_t numberOfOptions = ( sizeof options / sizeof(Option) );
         
+        /* Iterate through all arguments */
         for (int i = 1; args[i] != NULL; ++i)
         {
-            int wasValidOption = 1;
+            bool wasValidOption = true;
 
+            // for each argument, iterate through options and compare
             for (int j = 0; j < numberOfOptions; ++j)
             {
-                if ( args[i] && ( !strcmp(args[i], options[j].opt) || !strcmp(args[i], options[j].opt_short) ) )
+                if ( (strcmp(args[i], options[j].opt) == 0) || (strcmp(args[i], options[j].opt_short) == 0) )
                 {
                     switch (options[j].type)
                     {
                         case TIMESTAMP:
                         {
-                            if ( !strcmp(options[j].opt, "--begin") )
+                            DateTime* target;
+                            if (strcmp(options[j].opt, "--begin") == 0)
                             {
-                                switch (ICSTimeStampReader(args[i+1], &ve.start))
-                                {
-                                    case FAIL_TIMESTAMP_CORRUPT:
-                                    {
-                                        shell_say(ERROR, "DTSTART timestamp '%s' is invalid!", args[i+1]);
-                                        return 1;
-                                    }
-
-                                    default:
-                                    {
-                                        break;
-                                    }
-                                }
+                                target = &ve.start;
                             }
-                            else if ( !strcmp(options[j].opt, "--end") )
+                            else if (strcmp(options[j].opt, "--end") == 0)
                             {
-                                switch (ICSTimeStampReader(args[i+1], &ve.end))
-                                {
-                                    case FAIL_TIMESTAMP_CORRUPT:
-                                    {
-                                        shell_say(ERROR, "DTEND timestamp '%s' is invalid!", args[i+1]);
-                                        return 1;
-                                    }
+                                target = &ve.end;
+                            }
 
-                                    default:
-                                    {
-                                        break;
-                                    }
-                                }
+                            if (!shell_handleError( ICSTimeStampReader(args[i+1], target), NULL, 0, args[i+1] ))
+                            {
+                                return 1;
                             }
                             break;
                         }
 
                         case STRING:
                         {
-                            /* Special case, we need to find where string actually ends */
-
+                            /* We need to find where string actually ends */
                             int numberOfCharacters = 0;
                             int firstWord = i + 1;
                             if (args[firstWord][0] != '\'')
                             {
-                                shell_say(ERROR, "Strings need to be bounded with apostrophes! See 'help create' for more information");
+                                shell_say(ERROR, "Strings need to be bounded by apostrophes! See 'help create' for more information");
                                 return 1;
                             }
                             else
                             {
-                                int hasClosingApostrophe = 0;
+                                bool hasClosingApostrophe = false;
                                 for (i = firstWord; args[i] != NULL || !hasClosingApostrophe; ++i)
                                 {
                                     if (args[i][ strlen(args[i]) - 1 ] == '\'')
                                     {
-                                        hasClosingApostrophe = 1;
+                                        hasClosingApostrophe = true;
                                     }
-                                    numberOfCharacters += (strlen(args[i]) + 1); // also count spaces
+                                    numberOfCharacters += (strlen(args[i]) + 1); // +1 --> also count spaces
                                 }
 
                                 if (!hasClosingApostrophe)
@@ -516,62 +372,78 @@ int command_create(char** args)
                                 }
                             }
 
+                            /* Attempt to allocate memory for string */
                             char* tmp = malloc( sizeof(char) * (numberOfCharacters + 1) );
-                            if (!tmp)
+                            if (tmp == NULL)
                             {
                                 shell_say(ERROR, "Failed to allocate memory for event %s!", options[j].opt + 2);
                                 return 1;
                             }
                             
-                            if ( !strcmp(options[j].opt, "--summary") )
+                            char* target;
+                            if (strcmp(options[j].opt, "--summary") == 0)
                             {
-                                ve.summary = tmp;
-                                strcat(ve.summary, args[firstWord] + 1); // first word need not have apostrophe
-                                strcat(ve.summary, " "); // add space between words as intended
-                                for (int k = firstWord + 1; k < i; k++)
-                                {
-                                    strcat(ve.summary, args[k]);
-                                    strcat(ve.summary, " "); // add space between words as intended
-                                }
-                                ve.summary[strlen(ve.summary) - 2] = '\0'; // get rid of closing apostrophe and unnecessary space
+                                target = ve.summary;
+                                //ve.summary = tmp;
+                                //strcat(ve.summary, args[firstWord] + 1); // first word need not have apostrophe
+                                //strcat(ve.summary, " "); // add space between words as intended
+                                //for (int k = firstWord + 1; k < i; k++)
+                                //{
+                                //    strcat(ve.summary, args[k]);
+                                //    strcat(ve.summary, " "); // add space between words as intended
+                                //}
+                                //ve.summary[strlen(ve.summary) - 2] = '\0'; // get rid of closing apostrophe and unnecessary space
                             }
-                            else if ( !strcmp(options[j].opt, "--location") )
+                            else if (strcmp(options[j].opt, "--location") == 0)
                             {
-                                ve.location = tmp;
-                                strcat(ve.location, args[firstWord] + 1); // first word need not have apostrophe
-                                strcat(ve.location, " "); // add space between words as intended
-                                for (int k = firstWord + 1; k < i; k++)
-                                for (int k = firstWord; k < i; k++)
-                                {
-                                    strcat(ve.location, args[k]);
-                                    strcat(ve.location, " "); // add space between words as intended
-                                }
-                                ve.location[strlen(ve.location) - 2] = '\0'; // get rid of closing apostrophe and unnecessary space
+                                target = ve.location;
+                                //ve.location = tmp;
+                                //strcat(ve.location, args[firstWord] + 1); // first word need not have apostrophe
+                                //strcat(ve.location, " "); // add space between words as intended
+                                //for (int k = firstWord + 1; k < i; k++)
+                                //for (int k = firstWord; k < i; k++)
+                                //{
+                                //    strcat(ve.location, args[k]);
+                                //    strcat(ve.location, " "); // add space between words as intended
+                                //}
+                                //ve.location[strlen(ve.location) - 2] = '\0'; // get rid of closing apostrophe and unnecessary space
                             }
-                            else if ( !strcmp(options[j].opt, "--description") )
+                            else if (strcmp(options[j].opt, "--description") == 0)
                             {
-                                ve.description = tmp;
-                                strcat(ve.description, args[firstWord] + 1); // first word need not have apostrophe
-                                strcat(ve.description, " "); // add space between words as intended
-                                for (int k = firstWord; k < i; k++)
-                                {
-                                    strcat(ve.description, args[k]);
-                                    strcat(ve.description, " "); // add space between words as intended
-                                }
-                                ve.description[strlen(ve.description) - 2] = '\0'; // get rid of closing apostrophe and unnecessary space
+                                target = ve.description;
+                                //ve.description = tmp;
+                                //strcat(ve.description, args[firstWord] + 1); // first word need not have apostrophe
+                                //strcat(ve.description, " "); // add space between words as intended
+                                //for (int k = firstWord; k < i; k++)
+                                //{
+                                //    strcat(ve.description, args[k]);
+                                //    strcat(ve.description, " "); // add space between words as intended
+                                //}
+                                //ve.description[strlen(ve.description) - 2] = '\0'; // get rid of closing apostrophe and unnecessary space
                             }
+                            
+                            target = tmp;
+                            strcat(target, args[firstWord] + 1); // +1 --> get rid of opening apostrophe
+                            strcat(target, " "); // add space after first word
+                            for (int k = firstWord + 1; k < i; k++)
+                            {
+                                strcat(target, args[k]);
+                                strcat(target, " "); // add space after words
+                            }
+                            target[strlen(target) - 2] = '\0'; // -2 --> get rid of closing apostrophe (-1) and unnecessary space (-1)
+                            
                             break;
                         }
 
                         case NUMBER:
                         { // note: drunt only handles priorities as numbers as of yet
-                            if ( !myatoi(args[i+1], &ve.priority) )
+                            if (myatoi(args[i+1], &ve.priority) == 0)
                             {
                                 shell_say(ERROR, "Failed to convert event priority '%s' to a number!", args[i+1]);
                                 return 1;
                             }
 
-                            if ( !isValidPriority(ve.priority) )
+                            if (!isValidPriority(ve.priority))
                             {
                                 shell_say(ERROR, "Invalid priority value '%d'! Please check 'help' for more information", ve.priority);
                                 return 1;
@@ -579,12 +451,12 @@ int command_create(char** args)
                             break;
                         }
                     }
-                    options[j].flag = 1;
+                    options[j].flag = true;
                     break;
                 }
                 else if (j == numberOfOptions)
                 {
-                    wasValidOption = 0;
+                    wasValidOption = false;
                 }
             }
 
@@ -596,85 +468,110 @@ int command_create(char** args)
         }
         
         /* Prompt for omitted details */
-
         for (int i = 0; i < numberOfOptions; ++i)
         {
-            if ( !options[i].flag )
+            if (!options[i].flag)
             {
                 switch (options[i].type)
                 {
                     case TIMESTAMP:
                     {
-                        if ( !strcmp(options[i].opt, "--begin") )
+                        DateTime* target;
+                        TimestampType tt;
+                        if (strcmp(options[i].opt, "--begin") == 0)
                         {
-                            if ( !shell_readTimeStamp(&ve.start, DTSTART) )
-                            {
-                                return 1;
-                            }
+                            target = &ve.start;
+                            tt = DTSTART;
+                            //if ( !shell_readTimestamp(&ve.start, DTSTART) )
+                            //{
+                            //    return 1;
+                            //}
                         }
-                        else if ( !strcmp(options[i].opt, "--end") )
+                        else if (strcmp(options[i].opt, "--end") == 0)
                         {
-                            if ( !shell_readTimeStamp(&ve.end, DTEND) )
-                            {
-                                return 1;
-                            }
+                            target = &ve.end;
+                            tt = DTEND;
+                            //if ( !shell_readTimestamp(&ve.end, DTEND) )
+                            //{
+                            //    return 1;
+                            //}
+                        }
+                        
+                        if (!shell_handleError( shell_readTimestamp(target, tt), NULL, 0, NULL ))
+                        {
+                            return 1;
                         }
                         break;
                     }
 
                     case STRING:
                     {
-                        if ( !strcmp(options[i].opt, "--summary") )
+                        char** target; 
+                        if (strcmp(options[i].opt, "--summary") == 0)
                         {
+                            target = &ve.summary;
                             shell_say(PROMPT, "Event summary:");
-                            if ( !shell_readString(&ve.summary) )
-                            {
-                                return 1;
-                            }
+                            //if (!shell_readString(&ve.summary, MAX_LINELENGTH))
+                            //{
+                            //    return 1;
+                            //}
                         }
-                        else if ( !strcmp(options[i].opt, "--location") )
+                        else if (strcmp(options[i].opt, "--location") == 0)
                         {
+                            target = &ve.location;
                             shell_say(PROMPT, "Event location:");
-                            if ( !shell_readString(&ve.location) )
-                            {
-                                return 1;
-                            }
+                            //if ( !shell_readString(&ve.location, MAX_LINELENGTH) )
+                            //{
+                            //    return 1;
+                            //}
                         }
-                        else if ( !strcmp(options[i].opt, "--description") )
+                        else if (strcmp(options[i].opt, "--description") == 0)
                         {
+                            target = &ve.description;
                             shell_say(PROMPT, "Event description:");
-                            if ( !shell_readString(&ve.description) )
-                            {
-                                return 1;
-                            }
+                            //if ( !shell_readString(&ve.description, MAX_LINELENGTH) )
+                            //{
+                            //    return 1;
+                            //}
+                        }
+                        
+                        if (!shell_handleError( shell_readString(target, MAX_LINELENGTH), NULL, 0, NULL ))
+                        {
+                            return 1;
                         }
                         break;
                     }
 
                     case NUMBER:
                     { // note: drunt only handles priorities as numbers as of yet
-                        shell_say(PROMPT, "Event priority:");
-                        
-                        char buff[BUFFSIZE];
+                        int* target = &ve.priority;
 
+                        shell_say(PROMPT, "Event priority:");
+                        bool wasValid = true;
                         do
                         {
-                            fgets(buff, sizeof buff, stdin);
+                            if (!wasValid)
+                            {
+                                shell_say(ERROR, "Priority entered was invalid. Please try again. See 'help' for details");
+                            }
+
+                            if (!shell_handleError( shell_readNum(target), NULL, 0, NULL ))
+                            {
+                                return 1;
+                            }
+
+                            wasValid = isValidPriority(*target);
                         }
-                        while
-                            (
-                                ( sscanf(buff, "%d", &ve.priority) != EOF ) &&
-                                !isValidPriority(ve.priority)
-                            );
+                        while (!wasValid);
+                        
                         break;
                     }
                 }
             }
         }
-    } // TODO debug second case
+    }
 
     /* Confirm event with user */
-
     shell_say(NEUTRAL, "Event to be created:");
     printVEvent(ve);
     

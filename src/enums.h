@@ -48,6 +48,7 @@ typedef enum {
     FAIL_INVALID_MINUTE,
     FAIL_VEVENT_NOT_FOUND,
     FAIL_EOF,
+    FAIL_DNE,
     FAIL_UNKNOWN
 } MYERRNO;
 
@@ -69,19 +70,19 @@ typedef enum {
 typedef enum {
     DTSTART,
     DTEND
-} TIMESTAMPTYPE;
+} TimestampType;
 
 typedef enum {
     BEFORE,
     SAME,
     AFTER,
     RELATIVEDATE_ERROR
-} RELATIVEDATE;
+} RelativeDate;
 
 typedef enum {
     NUMBER,
     STRING,
     TIMESTAMP
-} ICSDATATYPE;
+} ICSDataType;
 
 #endif

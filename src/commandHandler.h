@@ -2,7 +2,6 @@
 #define COMMANDHANDLER_H__
 
 #include "structs.h"
-#include "commandHandler.h"
 #include "interactiveHandler.h"
 #include "dbHandler.h"
 #include "errorHandler.h"
@@ -18,7 +17,7 @@
 // ARRAYS //
 ////////////
 
-static const char* commands[] = {
+static char* commands[] = {
     "help",
     "exit",
     "q",
@@ -29,7 +28,7 @@ static const char* commands[] = {
     "list"
 };
 
-static size_t numberOfCommands = ( sizeof commands / sizeof(char*) );
+static size_t numberOfCommands = ( sizeof commands / sizeof(char*) ); // TODO get rid of this
 
 ///////////////
 // FUNCTIONS //

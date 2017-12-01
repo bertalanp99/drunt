@@ -55,8 +55,15 @@ typedef struct {
 
 typedef struct {
     char* tag;
-    ICSDATATYPE type;
+    ICSDataType type;
     int flag;
 } ICSTag;
+
+typedef struct {
+    MYERRNO rc;
+    char* path;
+    int line;
+    char* content;
+} ErrProps;
 
 #endif
