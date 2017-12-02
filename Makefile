@@ -1,79 +1,65 @@
-# [inspired by Nicholas Hamilton] #
+# COPIED FROM https://gist.github.com/rehno-lindeque/36e1e5720ca05f89e985fc7b62f54158
 
-#################
-# CONFIGURATION #
-#################
+ifdef VERBOSE
+	Q =
+	E = @true 
+else
+	Q = @
+	E = @echo 
+endif
 
-# compiler and Linker
-CC          := gcc
+CFILES := $(shell find src -mindepth 1 -maxdepth 4 -name "*.c")
+CXXFILES := $(shell find src -mindepth 1 -maxdepth 4 -name "*.cpp")
 
-# target binary
-TARGET      := drunt
+INFILES := $(CFILES) $(CXXFILES)
 
-# directories
-SRCDIR      := src
-INCDIR      := inc
-BUILDDIR    := obj
-TARGETDIR   := bin
+OBJFILES := $(CXXFILES:src/%.cpp=%) $(CFILES:src/%.c=%)
+DEPFILES := $(CXXFILES:src/%.cpp=%) $(CFILES:src/%.c=%)
+OFILES := $(OBJFILES:%=obj/%.o)
 
-# extensions of sources, includes and objects
-SRCEXT      := c
-DEPEXT      := h
-OBJEXT      := o
+BINFILE = drunt
 
-# flags, libraries, includes
-CFLAGS      := -Wall -Wextra -Wno-sign-compare -std=c99 -g 
-#LIB         := -fopenmp -lm -larmadillo
-#INC         := -I$(INCDIR) -I/usr/local/include
-#INCDEP      := -I$(INCDIR)
+COMMONFLAGS = -Wall -Wextra -pedantic
+LDFLAGS =
 
-######################
-# DO NOT EDIT BELOW  # ##############################################################
-######################
+ifdef DEBUG
+	COMMONFLAGS := $(COMMONFLAGS) -g
+endif
+CFLAGS = $(COMMONFLAGS) --std=c99
+CXXFLAGS = $(COMMONFLAGS) --std=c++0x
+DEPDIR = deps
+all: $(BINFILE)
+ifeq ($(MAKECMDGOALS),)
+-include Makefile.dep
+endif
+ifneq ($(filter-out clean, $(MAKECMDGOALS)),)
+-include Makefile.dep
+endif
 
-SOURCES     := $(shell find $(SRCDIR) -type f -name *.$(SRCEXT))
-OBJECTS     := $(patsubst $(SRCDIR)/%,$(BUILDDIR)/%,$(SOURCES:.$(SRCEXT)=.$(OBJEXT)))
+CC = gcc
+CXX = g++
 
-# default
-#all: resources $(TARGET)
-all: $(TARGET)
 
-# remake
-remake: purge all
+-include Makefile.local
 
-# copy resources from resources directory to target directory
-#resources: directories
-#	@cp $(RESDIR)/* $(TARGETDIR)/
+.PHONY: clean all depend
+.SUFFIXES:
+obj/%.o: src/%.c
+	$(E)C-compiling $<
+	$(Q)if [ ! -d `dirname $@` ]; then mkdir -p `dirname $@`; fi
+	$(Q)$(CC) -o $@ -c $< $(CFLAGS)
+obj/%.o: src/%.cpp
+	$(E)C++-compiling $<
+	$(Q)if [ ! -d `dirname $@` ]; then mkdir -p `dirname $@`; fi
+	$(Q)$(CXX) -o $@ -c $< $(CXXFLAGS)
+Makefile.dep: $(CFILES) $(CXXFILES)
+	$(E)Depend
+	$(Q)for i in $(^); do $(CXX) $(CXXFLAGS) -MM "$${i}" -MT obj/`basename $${i%.*}`.o; done > $@
 
-# make the directories
-directories:
-	@mkdir -p $(TARGETDIR)
-	@mkdir -p $(BUILDDIR)
-
-# clean only objects
+	
+$(BINFILE): $(OFILES)
+	$(E)Linking $@
+	$(Q)$(CXX) -o $@ $(OFILES) $(LDFLAGS)
 clean:
-	@$(RM) -rf $(BUILDDIR)
-
-# full clean: cleans objects and binaries
-purge: clean
-	@$(RM) -rf $(TARGETDIR)
-
-# pull in dependency info for *existing* .o files
-#-include $(OBJECTS:.$(OBJEXT)=.$(DEPEXT))
-
-# linking
-$(TARGET): $(OBJECTS)
-	$(CC) -o $(TARGETDIR)/$(TARGET) $^ $(LIB)
-
-# compilation
-$(BUILDDIR)/%.$(OBJEXT): $(SRCDIR)/%.$(SRCEXT)
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INC) -c -o $@ $<
-	@$(CC) $(CFLAGS) $(INCDEP) -MM $(SRCDIR)/$*.$(SRCEXT) > $(BUILDDIR)/$*.$(DEPEXT)
-	@cp -f $(BUILDDIR)/$*.$(DEPEXT) $(BUILDDIR)/$*.$(DEPEXT).tmp
-	@sed -e 's|.*:|$(BUILDDIR)/$*.$(OBJEXT):|' < $(BUILDDIR)/$*.$(DEPEXT).tmp > $(BUILDDIR)/$*.$(DEPEXT)
-	@sed -e 's/.*://' -e 's/\\$$//' < $(BUILDDIR)/$*.$(DEPEXT).tmp | fmt -1 | sed -e 's/^ *//' -e 's/$$/:/' >> $(BUILDDIR)/$*.$(DEPEXT)
-	@rm -f $(BUILDDIR)/$*.$(DEPEXT).tmp
-
-#Non-File Targets
-#.PHONY: all remake clean cleaner resources
+	$(E)Removing files
+	$(Q)rm -f $(BINFILE) obj/* Makefile.dep

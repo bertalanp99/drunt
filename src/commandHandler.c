@@ -3,6 +3,8 @@
 #include <time.h>
 #include <stdbool.h>
 
+#define DEFAULT_YEARLISTWIDTH 3
+
 int (*runCommand[])(char**) = {
     &command_help,
     &command_exit,
@@ -131,7 +133,7 @@ int command_exit(char** args)
         {
             shell_say(STATUS, "For some odd reason, file has been set to a NULL pointer. Where would you like to save your calendar?");
             
-            if (!shell_handleError( shell_readString(&file, MAX_PATHLENGTH) , file, 0, NULL))
+            if (!shell_handleError( shell_readString("Path", &file, MAX_PATHLENGTH) , file, 0, NULL))
             {
                 shell_say(ERROR, "Failed to read path to savefile");
                 return 1;
@@ -144,12 +146,13 @@ int command_exit(char** args)
             if (!shell_handleError( ICS_write(file, &calendar, OVERWRITE), file, 0, NULL ))
             {
                 shell_say(ERROR, "Failed to safely exit. Please use option '-d' to forcefully exit drunt and discard any changes");
+                return 1;
             }
 
             return 0; // EXIT
         }
     }
-    else if ( !strcmp(args[1], "--discard") || !strcmp(args[1], "-d") )
+    else if ( ((strcmp(args[1], "--discard") == 0) || (strcmp(args[1], "-d") == 0)) && args[2] == NULL )
     {
         shell_say(WARNING, "About to exit drunt without saving changes! Are you sure?");
         if (!shell_promptYN("Sure you want to exit?"))
@@ -165,7 +168,7 @@ int command_exit(char** args)
     }
     else
     {
-        shell_say(ERROR, "Invalid argument: %s", args[1]);
+        shell_say(ERROR, "Too many arguments or argument '%s' is invalid", args[1]);
         return 1;
     }
 }
@@ -196,7 +199,7 @@ int command_load(char** args)
     if (args[1] == NULL)
     {
         char* path;
-        if (!shell_handleError( shell_readString(&path, MAX_PATHLENGTH), path, 0, NULL ))
+        if (!shell_handleError( shell_readString("Path", &path, MAX_PATHLENGTH), path, 0, NULL ))
         {
             return 1;
         }
@@ -279,18 +282,18 @@ int command_create(char** args)
     {   
         if
             (
-                !shell_handleError( shell_readTimestamp(&ve.start, DTSTART),            NULL, 0, NULL ) ||
-                !shell_handleError( shell_readTimestamp(&ve.end, DTEND),                NULL, 0, NULL ) ||
-                !shell_handleError( shell_readString(&ve.summary, MAX_LINELENGTH),      NULL, 0, NULL ) ||
-                !shell_handleError( shell_readString(&ve.location, MAX_LINELENGTH),     NULL, 0, NULL ) ||
-                !shell_handleError( shell_readString(&ve.description, MAX_LINELENGTH),  NULL, 0, NULL ) ||
-                !shell_handleError( shell_readNum(&ve.priority),                        NULL, 0, NULL )
+                !shell_handleError( shell_readTimestamp(&ve.start, DTSTART),                            NULL, 0, NULL ) ||
+                !shell_handleError( shell_readTimestamp(&ve.end, DTEND),                                NULL, 0, NULL ) ||
+                !shell_handleError( shell_readString("Short summary", &ve.summary, MAX_LINELENGTH),    NULL, 0, NULL ) ||
+                !shell_handleError( shell_readString("Location", &ve.location, MAX_LINELENGTH),         NULL, 0, NULL ) ||
+                !shell_handleError( shell_readString("Description", &ve.description, MAX_LINELENGTH),   NULL, 0, NULL ) ||
+                !shell_handleError( shell_readNum("Priority", &ve.priority),                            NULL, 0, NULL )
             )
         {
             return 1;
         }
     }
-    /* THERE IS AT LEAST ONE ARGUMENT PASSED */
+    /* AT LEAST ONE ARGUMENT PASSED */
     else
     {
         // temporary structure
@@ -322,6 +325,13 @@ int command_create(char** args)
             {
                 if ( (strcmp(args[i], options[j].opt) == 0) || (strcmp(args[i], options[j].opt_short) == 0) )
                 {
+                    /* To prevent SEGFAULT's, check whether there's actually something after the option */
+                    if (args[i+1] == NULL)
+                    {
+                        shell_say(ERROR, "Option '%s' missing argument. Please check 'help create' for more information", args[i]);
+                        return 1;
+                    }
+
                     switch (options[j].type)
                     {
                         case TIMESTAMP:
@@ -345,7 +355,7 @@ int command_create(char** args)
 
                         case STRING:
                         {
-                            /* We need to find where string actually ends */
+                            /* Find string boundaries (apostrophes) */
                             int numberOfCharacters = 0;
                             int firstWord = i + 1;
                             if (args[firstWord][0] != '\'')
@@ -356,18 +366,19 @@ int command_create(char** args)
                             else
                             {
                                 bool hasClosingApostrophe = false;
-                                for (i = firstWord; args[i] != NULL || !hasClosingApostrophe; ++i)
+                                for (i = firstWord; args[i] != NULL; ++i)
                                 {
                                     if (args[i][ strlen(args[i]) - 1 ] == '\'')
                                     {
                                         hasClosingApostrophe = true;
+                                        break;
                                     }
                                     numberOfCharacters += (strlen(args[i]) + 1); // +1 --> also count spaces
                                 }
 
                                 if (!hasClosingApostrophe)
                                 {
-                                    shell_say(ERROR, "String missing closing apostrophe! Strings have to be bounded by two apostrophes, like this 'my text'");
+                                    shell_say(ERROR, "String missing closing apostrophe! Strings have to be bounded by two apostrophes, like this: 'my text'");
                                     return 1;
                                 }
                             }
@@ -380,57 +391,29 @@ int command_create(char** args)
                                 return 1;
                             }
                             
-                            char* target;
+                            char** target;
                             if (strcmp(options[j].opt, "--summary") == 0)
                             {
-                                target = ve.summary;
-                                //ve.summary = tmp;
-                                //strcat(ve.summary, args[firstWord] + 1); // first word need not have apostrophe
-                                //strcat(ve.summary, " "); // add space between words as intended
-                                //for (int k = firstWord + 1; k < i; k++)
-                                //{
-                                //    strcat(ve.summary, args[k]);
-                                //    strcat(ve.summary, " "); // add space between words as intended
-                                //}
-                                //ve.summary[strlen(ve.summary) - 2] = '\0'; // get rid of closing apostrophe and unnecessary space
+                                target = &ve.summary;
                             }
                             else if (strcmp(options[j].opt, "--location") == 0)
                             {
-                                target = ve.location;
-                                //ve.location = tmp;
-                                //strcat(ve.location, args[firstWord] + 1); // first word need not have apostrophe
-                                //strcat(ve.location, " "); // add space between words as intended
-                                //for (int k = firstWord + 1; k < i; k++)
-                                //for (int k = firstWord; k < i; k++)
-                                //{
-                                //    strcat(ve.location, args[k]);
-                                //    strcat(ve.location, " "); // add space between words as intended
-                                //}
-                                //ve.location[strlen(ve.location) - 2] = '\0'; // get rid of closing apostrophe and unnecessary space
+                                target = &ve.location;
                             }
                             else if (strcmp(options[j].opt, "--description") == 0)
                             {
-                                target = ve.description;
-                                //ve.description = tmp;
-                                //strcat(ve.description, args[firstWord] + 1); // first word need not have apostrophe
-                                //strcat(ve.description, " "); // add space between words as intended
-                                //for (int k = firstWord; k < i; k++)
-                                //{
-                                //    strcat(ve.description, args[k]);
-                                //    strcat(ve.description, " "); // add space between words as intended
-                                //}
-                                //ve.description[strlen(ve.description) - 2] = '\0'; // get rid of closing apostrophe and unnecessary space
+                                target = &ve.description;
                             }
                             
-                            target = tmp;
-                            strcat(target, args[firstWord] + 1); // +1 --> get rid of opening apostrophe
-                            strcat(target, " "); // add space after first word
+                            *target = tmp;
+                            strcat(*target, args[firstWord] + 1); // +1 --> get rid of opening apostrophe
+                            strcat(*target, " "); // add space after first word
                             for (int k = firstWord + 1; k < i; k++)
                             {
-                                strcat(target, args[k]);
-                                strcat(target, " "); // add space after words
+                                strcat(*target, args[k]);
+                                strcat(*target, " "); // add space after words
                             }
-                            target[strlen(target) - 2] = '\0'; // -2 --> get rid of closing apostrophe (-1) and unnecessary space (-1)
+                            (*target)[strlen(*target) - 2] = '\0'; // -2 --> get rid of closing apostrophe (-1) and unnecessary space (-1)
                             
                             break;
                         }
@@ -482,19 +465,11 @@ int command_create(char** args)
                         {
                             target = &ve.start;
                             tt = DTSTART;
-                            //if ( !shell_readTimestamp(&ve.start, DTSTART) )
-                            //{
-                            //    return 1;
-                            //}
                         }
                         else if (strcmp(options[i].opt, "--end") == 0)
                         {
                             target = &ve.end;
                             tt = DTEND;
-                            //if ( !shell_readTimestamp(&ve.end, DTEND) )
-                            //{
-                            //    return 1;
-                            //}
                         }
                         
                         if (!shell_handleError( shell_readTimestamp(target, tt), NULL, 0, NULL ))
@@ -510,32 +485,20 @@ int command_create(char** args)
                         if (strcmp(options[i].opt, "--summary") == 0)
                         {
                             target = &ve.summary;
-                            shell_say(PROMPT, "Event summary:");
-                            //if (!shell_readString(&ve.summary, MAX_LINELENGTH))
-                            //{
-                            //    return 1;
-                            //}
+                            shell_say(PROMPT, "Short summary:");
                         }
                         else if (strcmp(options[i].opt, "--location") == 0)
                         {
                             target = &ve.location;
-                            shell_say(PROMPT, "Event location:");
-                            //if ( !shell_readString(&ve.location, MAX_LINELENGTH) )
-                            //{
-                            //    return 1;
-                            //}
+                            shell_say(PROMPT, "Location:");
                         }
                         else if (strcmp(options[i].opt, "--description") == 0)
                         {
                             target = &ve.description;
-                            shell_say(PROMPT, "Event description:");
-                            //if ( !shell_readString(&ve.description, MAX_LINELENGTH) )
-                            //{
-                            //    return 1;
-                            //}
+                            shell_say(PROMPT, "Description:");
                         }
                         
-                        if (!shell_handleError( shell_readString(target, MAX_LINELENGTH), NULL, 0, NULL ))
+                        if (!shell_handleError( shell_readString(NULL, target, MAX_LINELENGTH), NULL, 0, NULL ))
                         {
                             return 1;
                         }
@@ -546,7 +509,7 @@ int command_create(char** args)
                     { // note: drunt only handles priorities as numbers as of yet
                         int* target = &ve.priority;
 
-                        shell_say(PROMPT, "Event priority:");
+                        //shell_say(PROMPT, "Event priority:");
                         bool wasValid = true;
                         do
                         {
@@ -555,7 +518,7 @@ int command_create(char** args)
                                 shell_say(ERROR, "Priority entered was invalid. Please try again. See 'help' for details");
                             }
 
-                            if (!shell_handleError( shell_readNum(target), NULL, 0, NULL ))
+                            if (!shell_handleError( shell_readNum("Priority:", target), NULL, 0, NULL ))
                             {
                                 return 1;
                             }
@@ -573,9 +536,9 @@ int command_create(char** args)
 
     /* Confirm event with user */
     shell_say(NEUTRAL, "Event to be created:");
-    printVEvent(ve);
+    printVEvent(ve, 0);
     
-    if (!promptYN("[ ?? ] Confirm?"))
+    if (!shell_promptYN("Confirm?"))
     {
         shell_say(STATUS, "No event created");
         return 1;
@@ -600,153 +563,266 @@ int command_modify(char** args)
 int command_delete(char** args)
 {
     assert(args);
-    shell_say(WARNING, "This command does nothing; it has not been implemented yet.");
     
-    return 1;
+    if ((args[1] == NULL) || (args[2] == NULL) || (args[3] == NULL))
+    {
+        shell_say(ERROR, "Insufficient arguments passed to 'delete'. Please check 'help delete' for more information");
+        return 1;
+    }
+    else
+    {
+        if (args[4] != NULL)
+        {
+            shell_say(ERROR, "Too many arguments passed to 'delete'. Please check 'help delete' for more information");
+            return 1;
+        }
+        
+        /* Check number of VEvents on specified day */
+        DateTime from;
+        DateTime to;
+        if
+            (
+                !shell_handleError(parseDateTime(&from, args[1], args[2], args[3], "00", "00"), NULL, 0, NULL) ||
+                !shell_handleError(parseDateTime(&to, args[1], args[2], args[3], "23", "59"), NULL, 0, NULL)
+            )
+        {
+            return 1;
+        }       
+
+        int count = countVEvents(&calendar, from, to);
+        int chosenOne = -1; // initialise to impossible value
+
+        if (count == 0)
+        {
+            shell_say(STATUS, "No events found on day specified: nothing to delete");
+        }
+        else if (count == 1)
+        {
+            char* tempArgs[] = { "list", "day", args[1], args[2], args[3], NULL };
+            command_list(tempArgs);
+            shell_say(STATUS, "Only one event found on day specified. You can see it above.");
+            if (!shell_promptYN("Sure you want to delete that event?"))
+            {
+                shell_say(STATUS, "Cancelled deleting event");
+                return 1;
+            }
+            chosenOne = 1;
+        }
+        else
+        {
+            char* tempArgs[] = { "list", "day", args[1], args[2], args[3] };
+            command_list(tempArgs);
+            shell_say(STATUS, "Multiple events found on day specified. They are printed above with numbers as indices");
+            if (!shell_handleError(shell_readNum("Please enter index representing event to delete", &chosenOne), NULL, 0, 0))
+            {
+                return 1;
+            }
+            
+            if (chosenOne <= 0 || chosenOne > count)
+            {
+                shell_say(ERROR, "The number you have entered is either less than 0, equal to 0 or more than events on day specified. Cancelling operation");
+                return 1;
+            }
+        }
+        
+        shell_say(PROGRESS, "Deleting event...");
+
+        /* Traverse calendar, find VEvent and make it suffer ;) (sorry, I'm getting a bit annoyed) */
+        VEventNode* traveller = calendar.first->next;
+        while (traveller != calendar.last && compareDateTime(traveller->ve.start, from) == BEFORE)
+        {
+            traveller = traveller->next;
+        }
+        for (int i = 1; i < chosenOne; ++i)
+        {
+            traveller = traveller->next;
+        }
+        if (!shell_handleError(Calendar_deleteVEvent(&calendar, traveller->ve), NULL, 0, NULL))
+        {
+            return 1;
+        }
+        
+        shell_say(SUCCESS, "Successfully deleted event! (Just so you know, there's no way to bring it back)");
+        return 1;
+    } 
 }
 
 int command_list(char** args)
 {
-    if (!args[1])
+    /* NO ARGUMENTS PASSED --> do nothing */
+    if (args[1] == NULL)
     {
         shell_say(ERROR, "Command 'list' needs at least one argument! Check 'help list' for more information!");
         return 1;
     }
     
-    if ( !strcmp(args[1], "year") && args[2] && !args[3] )
+    /* ARGUMENT#1 == year --> check other args */
+    if ( (strcmp(args[1], "year") == 0))
     {
-        int year;
-        if ( !myatoi(args[2], &year) )
+        if (args[2] == NULL)
         {
-            shell_say(ERROR, "Failed to convert entered year to number. Expected input such as '2020'");
+            shell_say(ERROR, "Insufficient arguments passed to 'list year'. Pleas check 'help list' for more information");
+            return 1;
+        }    
+
+        DateTime year;
+        int layoutWidth = DEFAULT_YEARLISTWIDTH;
+
+        if ( (strcmp(args[2], "--width") == 0) || (strcmp(args[2], "-w") == 0) )
+        {
+            if (args[3] == NULL)
+            {
+                shell_say(ERROR, "Width option has been passed but didn't get argument. Check 'help list' for more information");
+                return 1;
+            }
+
+            if (myatoi(args[3], &layoutWidth) == 0)
+            {
+                shell_say(ERROR, "Failed to convert requested layout width '%s' to an integer", args[3]);
+                return 1;
+            }
+            
+            if (layoutWidth < 1 || layoutWidth > 4)
+            {
+                shell_say(ERROR, "Invalid year listing width specified '%d'. Valid value range: 1 -- 4", layoutWidth);
+                return 1;
+            }
+
+            shell_say(STATUS, "Will print using width %d", layoutWidth);
+            
+            if (args[4] == NULL)
+            {
+                shell_say(ERROR, "Insufficient arguments to 'list year'. Please check 'help list' for more information");
+                return 1;
+            }
+
+            if ( !shell_handleError(parseDateTime(&year, args[4], "01", "01", "00", "00"), NULL, 0, NULL) )
+            {
+                return 1;
+            }
+        }
+        else if ( !shell_handleError(parseDateTime(&year, args[2], "01", "01", "00", "00"), NULL, 0, NULL) )
+        {
             return 1;
         }
+        
+        shell_say(PROGRESS, "Listing year %04d below...", year.date.year);
+        printYear(year.date, layoutWidth); 
 
-        if ( !isValidYear(year) )
-        {
-            shell_say(ERROR, "The year you entered is invalid. Drunt expects it in YYYY format. Limited from 1950 to 2050!");
-            return 1;
-        }
-
-        shell_say(PROGRESS, "Listing year %04d below...", year);
-
-        // TODO need month lister!
         return 1;
     }
-    else if ( !strcmp(args[1], "month") && args[2] && args[3] && !args[4] )
+    /* ARGUMENT#1 == month && ARGUMENT#2 AND ARGUMENT#3 PASSED --> list by month ARGUMENT#3 of year ARGUMENT#2 */
+    else if ( (strcmp(args[1], "month") == 0) && (args[4] == NULL) )
     {
-        Date month;
-
-        if ( !myatoi(args[2], &month.year) )
+        if (args[2] == NULL || args[3] == NULL)
         {
-            shell_say(ERROR, "Failed to convert entered year to number. Expected input such as '2020'");
+            shell_say(ERROR, "Insufficient arguments passed to 'list month'. Pleas check 'help list' for more information");
             return 1;
         }
 
-        if ( !isValidYear(month.year) )
+        /* Process arguments */
+        DateTime month;
+        if ( !shell_handleError(parseDateTime(&month, args[2], args[3], "01", "00", "00"), NULL, 0, NULL) )
         {
-            shell_say(ERROR, "The year you entered is invalid. Drunt expects it in YYYY format. Limited from 1950 to 2050!");
             return 1;
         }
 
-        if ( !myatoi(args[3], &month.month) )
-        {
-            shell_say(ERROR, "Failed to convert entered month to number. Expected input such as '05'");
-            return 1;
-        }
-
-        if ( !isValidMonth(month.month) )
-        {
-            shell_say(ERROR, "The month you entered is invalid. Drunt expects it in MM format.");
-            return 1;
-        }
-
-        month.day = 1;
-
-        shell_say(PROGRESS, "Listing month %02d of year %04d below...", month.month, month.year);
-
-        printMonth(month, &calendar);
+        /* List by month */
+        shell_say(PROGRESS, "Listing month %02d of year %04d below...", month.date.month, month.date.year);
+        printMonth(month.date, &calendar);
         
         return 1;
     }
-    else if ( !strcmp(args[1], "day") && args[2] && args[3] && args[4] && !args[5])
+    /* ARGUMENT#1 == day && ARGUMENT#2 AND ARGUMENT#3 AND ARGUMENT#4 PASSED --> list by day ARGUMENT#4 of month ARGUMENT#3 or year ARGUMENT#2 */
+    else if ( (strcmp(args[1], "day") == 0) && (args[5] == NULL) )
     {
-        /* Process input */
-        DateTime tmp;
-        if ( !shell_handleError(parseDateTime(&tmp, args[2], args[3], args[4], "0", "0"), NULL, 0, NULL) )
+        if (args[2] == NULL || args[3] == NULL || args[3] == NULL)
+        {
+            shell_say(ERROR, "Insufficient arguments passed to 'list day'. Please check 'help list' for more information");
+            return 1;
+        }
+
+        /* Process arguments */
+        DateTime day;
+        if ( !shell_handleError(parseDateTime(&day, args[2], args[3], args[4], "00", "00"), NULL, 0, NULL) )
         {
             return 1;
         }
-        Date day = tmp.date;
 
-        /* Traverse calendar to until given day is reached*/
+        /* Traverse calendar until day passed as argument is reached*/
         VEventNode* traveller = calendar.first->next;
-        while( traveller != calendar.last && compareDate(traveller->ve.start.date, day) != SAME)
+        while( traveller != calendar.last && compareDate(traveller->ve.start.date, day.date) != SAME)
         {
             traveller = traveller->next;
         }
 
         /* Keep traversing, but also print out events and hour headers */
-        printDayHeader(day);
+        printDayHeader(day.date);
         int count = 1;
         int hour = -1; // initialise to impossible value
-        int isAtNewHour = 1;
-        while ( traveller != calendar.last && compareDate(traveller->ve.start.date, day) == SAME)
+        bool isAtNewHour = true;
+        while ( traveller != calendar.last && compareDate(traveller->ve.start.date, day.date) == SAME)
         {
             if (traveller->ve.start.time.hour != hour)
             {
                 hour = traveller->ve.start.time.hour;
-                isAtNewHour = 1;
+                isAtNewHour = true;
             }
             
             if (isAtNewHour)
             {
                 printHourHeader(traveller->ve.start.time.hour);
-                isAtNewHour = 0;
+                isAtNewHour = false;
             }
             
-            printVEventWCount(traveller->ve, count);
+            printVEvent(traveller->ve, count);
             traveller = traveller->next;
         }
 
     }
-    else if ( !strcmp(args[1], "agenda") ) // TODO create separate functions
+    /* ARGUMENT#1 == agenda --> check whether there is another argument */
+    else if (strcmp(args[1], "agenda") == 0)
     {
-        if ( !args[2] ) // no argument --> list this week
+        /* NO ARGUMENT#2 --> list next week (default) */
+        if (args[2] == NULL)
         {
+            /* Get current date and calculate date in 7 days */
             DateTime now = currentDateTime();
             DateTime until = addDaysToDateTime(now, 7);
 
-            /* Traverse calendar until first event after 'now' is found */
+            /* Traverse calendar until first future event is found */
             VEventNode* traveller = calendar.first->next;
             while (traveller != calendar.last && compareDateTime(traveller->ve.start, now) == BEFORE)
             {
                 traveller = traveller->next;
             }
 
-            /* Keep traversing, but also print events in given period */
+            /* Keep traversing, but also print events of next 7 days */
             int count = 1;
             while (traveller != calendar.last && compareDateTime(traveller->ve.start, until) != AFTER)
             {
-                printVEventWCount(traveller->ve, count);
+                printVEvent(traveller->ve, count);
                 ++count;
                 traveller = traveller->next;
             }
 
         }
-        else if ( !args[3] ) // argument passed --> process
+        /* ARGUMENT#2 PASSED --> list next ARGUMENT#2 days */
+        else if (args[3] == NULL)
         {
+            /* Process argument */
             int period;
-            if ( !myatoi(args[2], &period) )
+            if (myatoi(args[2], &period) == 0)
             {
-                shell_say(ERROR, "Number of days passed to 'list agenda' could not be converted to a number! Please check?");
+                shell_say(ERROR, "Argument passed ('%s') could not be converted to a number! Expected a number representing days in a reasonable range", args[2]);
                 return 1;
             }
 
+            /* Get current date and calculate date in ARGUMENT#2 days */
             DateTime now = currentDateTime();
             DateTime until = addDaysToDateTime(now, period);
 
-            /* Traverse calendar until first event after 'now' is found */
+            /* Traverse calendar until first future event is found */
             VEventNode* traveller = calendar.first->next;
             while (traveller != calendar.last && compareDateTime(traveller->ve.start, now) == BEFORE)
             {
@@ -757,20 +833,28 @@ int command_list(char** args)
             int count = 1;
             while (traveller != calendar.last && compareDateTime(traveller->ve.start, until) != AFTER)
             {
-                printVEventWCount(traveller->ve, count);
+                printVEvent(traveller->ve, count);
                 ++count;
                 traveller = traveller->next;
             }
         }
+        /* TOO MANY ARGUMENTS PASSED --> cancel */
         else
         {
-            shell_say(ERROR, "Command 'list agenda' got too many arguments! Check 'help agenda' for available options!");
+            shell_say(ERROR, "Received too many arguments! Check 'help agenda' for more information!");
             return 1;
         }
     }
+    /* ARGUMENT#1 PASSED BUT INVALID --> cancel */
+    else if (args[2] == NULL)
+    {
+        shell_say(ERROR, "Invalid argument '%s' received! Check 'help list' for more information!");
+        return 1;
+    }
+    /* TOO MANY ARGUMENTS PASSED --> cancel */
     else
     {
-        shell_say(ERROR, "Invalid arguments to 'list'! Check 'help list' for available options!");
+        shell_say(ERROR, "Too many arguments passed! Check 'help list' for more information!");
         return 1;
     }
 

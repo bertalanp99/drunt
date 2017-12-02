@@ -20,7 +20,6 @@
 static char* commands[] = {
     "help",
     "exit",
-    "q",
     "load",
     "create",
     "modify",

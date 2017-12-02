@@ -4,6 +4,7 @@
 #include "arrays.h"
 
 #include <stdio.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <limits.h>
@@ -63,19 +64,19 @@ MYERRNO ICSVEventCounter(const char* file, int* n)
     return SUCCESS;
 }
 
-int isValidICS(const char* file)
+bool isValidICS(const char* file)
 {
     assert(file != NULL);
     
     if (isNonEmptyFile(file) != SUCCESS)
     {
-        return 0; // empty file
+        return false; // empty file
     }
 
     FILE* fp = fopen(file, "r");
     if (fp == NULL)
     {
-        return 0; // unable to read
+        return false; // unable to read
     }
 
     /* Go through the file line by line; if a line starting with BEGIN is found, look
@@ -103,7 +104,7 @@ int isValidICS(const char* file)
     removeNewLineChar(buff);
     if ( strcmp(buff, "BEGIN:VCALENDAR") )
     {
-        return 0; // first line is not BEGIN:VCALENDAR
+        return false; // first line is not BEGIN:VCALENDAR
     }
 
     // check other lines
@@ -114,19 +115,19 @@ int isValidICS(const char* file)
         if (endCalendarFlag)
         {
             warning("Content found after END:VCALENDAR at %s:%d\n[ x> ]\t%s", file, currentLine, buff);
-            return 0;
+            return false;
         }
         else if ( !strcmp(buff, "BEGIN:VCALENDAR") )
         {
             warning("Nested VCALENDAR at %s:%d\n[ x> ]\t%s", file, currentLine, buff);
-            return 0;
+            return false;
         }
         else if ( !strcmp(buff, "END:VCALENDAR") )
         {
             if (beginVEventFlag)
             {
-                warning("BEGIN:VCALENDAR closed by END:VCALENDAR at %s:%d\n[ x> ]\t%s", file, currentLine, buff);
-                return 0;
+                warning("BEGIN:VEVENT closed by END:VCALENDAR at %s:%d\n[ x> ]\t%s", file, currentLine, buff);
+                return false;
             }
             else
             {
@@ -138,7 +139,7 @@ int isValidICS(const char* file)
             if (beginVEventFlag)
             {
                 warning("Nested VEVENT at %s:%d\n[ x> ]\t%s", file, currentLine, buff);
-                return 0;
+                return false;
             }
             else
             {
@@ -150,7 +151,7 @@ int isValidICS(const char* file)
             if (!beginVEventFlag)
             {
                 warning("END:VEVENT found without preceding BEGIN:VEVENT at %s:%d\n[ x> ]\t%s", file, currentLine, buff);
-                return 0;
+                return false;
             }
             else
             {
@@ -175,7 +176,7 @@ int isValidICS(const char* file)
                 else
                 {
                     warning("END:VEVENT found without required VEVENT detauls preceding at %d\n[ x> ]\t%s", file, currentLine, buff);
-                    return 0;
+                    return false;
                 }
             }
         }
@@ -188,7 +189,7 @@ int isValidICS(const char* file)
                     if ( !beginVEventFlag )
                     {
                         warning("Found '%s' outside VEVENT block at %s:%d\n[ x> ]\t%s", file, currentLine, buff);
-                        return 0;
+                        return false;
                     }
                     else
                     {
@@ -199,7 +200,7 @@ int isValidICS(const char* file)
                                 if ( !isValidICSTimeStamp(buff + strlen(tags[i].tag)) )
                                 {
                                     warning("Found invalid timestamp at %s:%d\n[ x> ]\t%s", file, currentLine, buff);
-                                    return 0;
+                                    return false;
                                 }
                                 else
                                 {
@@ -213,7 +214,7 @@ int isValidICS(const char* file)
                                 if ( strlen(buff) > MAX_LINELENGTH )
                                 {
                                     warning("Summary exceeds iCalendar limit (75 octets) at %s:%d", file, currentLine);
-                                    return 0;
+                                    return false;
                                 }
                                 else
                                 {
@@ -222,20 +223,20 @@ int isValidICS(const char* file)
                                 break;
                             }
 
-                            case NUMBER: // TODO drunt only processes priority as NUMER
+                            case NUMBER: // note: drunt only processes priority as NUMER
                             {
                                 int n;
                                 if ( !myatoi(buff + strlen(tags[i].tag), &n) )
                                 {
                                     warning("Failed to convert priority to integer at %s:%d\n[ x> ]\t%s", file, currentLine, buff);
-                                    return 0;
+                                    return false;
                                 }
                                 else
                                 {
                                     if ( !isValidPriority(n) )
                                     {
                                         warning("Invalid priority at %s:%d\n[ x> ]\t%s", file, currentLine, buff);
-                                        return 0;
+                                        return false;
                                     }
                                     else
                                     {
@@ -254,42 +255,45 @@ int isValidICS(const char* file)
     if ( !endCalendarFlag )
     {
         warning("No END:VCALENDAR found in '%s'! Last line read:\n[ x> ]\t%s", file, buff);
-        return 0;
+        return false;
     }
     else
     {
-        return 1;
+        return true;
     }
 
     fclose(fp);
 }
 
-int isValidPriority(int p)
+bool isValidPriority(int p)
 {
     return (p >= 0 && p < 10);
 }
 
-int isValidICSTimeStamp(const char* timestamp)
+bool isValidICSTimeStamp(const char* timestamp)
 {
     assert(timestamp != NULL && strcmp(timestamp, ""));
    
     // temporarily myatoi() everything and also check their validity
     char buff[8]; // 4+1 would be enough though
-    int tmp;
-    int tmpMonth;
+    int year;
+    int month;
+    int day;
+    int hour;
+    int minute;
 
     return
         (
-            myatoi(mystrncpy(buff, timestamp, 4), &tmp)             && isValidYear(tmp)             &&
-            myatoi(mystrncpy(buff, timestamp + 4, 2), &tmpMonth)    && isValidMonth(tmpMonth)       &&
-            myatoi(mystrncpy(buff, timestamp + 6, 2), &tmp)         && isValidDay(tmp, tmpMonth)    &&
-            myatoi(mystrncpy(buff, timestamp + 9, 2), &tmp)         && isValidHour(tmp)             &&
-            myatoi(mystrncpy(buff, timestamp + 11, 2), &tmp)        && isValidMinute(tmp)           &&
+            myatoi(mystrncpy(buff, timestamp, 4), &year)         && isValidYear(year)               &&
+            myatoi(mystrncpy(buff, timestamp + 4, 2), &month)    && isValidMonth(month)             &&
+            myatoi(mystrncpy(buff, timestamp + 6, 2), &day)      && isValidDay(day, month, year)    &&
+            myatoi(mystrncpy(buff, timestamp + 9, 2), &hour)     && isValidHour(hour)               &&
+            myatoi(mystrncpy(buff, timestamp + 11, 2), &minute)  && isValidMinute(minute)           &&
             timestamp[15] == 'Z'
         );
 }
 
-int hasNewLineChar(const char* str)
+bool hasNewLineChar(const char* str)
 {
     return ( str[strlen(str) - 1] == '\n' || strcmp(str + strlen(str) - 2, "\r\n") );
 }
@@ -351,47 +355,54 @@ MYERRNO ICSTimeStampReader(const char* ts, DateTime* dt)
     return SUCCESS;
 }
 
-int isValidYear(const int year)
+bool isValidYear(const int year)
 {
     return (year >= 1950 && year <= 2050);
 }
 
-int isValidMonth(const int month)
+bool isValidMonth(const int month)
 {
     return (month >= 1 && month <= 12);
 }
 
-int isValidDay(const int day, const int month)
+bool isValidDay(const int day, const int month, const int year)
 {
-    return (day >=1 && day <= monthLength[month - 1]);
+    if (isLeapYear(year) && (month == 2))
+    {
+        return (day >= 1 && day <= (monthLength[month - 1] + 1));
+    }
+    else
+    {
+        return (day >=1 && day <= monthLength[month - 1]);
+    }
 }
 
-int isValidHour(const int hour)
+bool isValidHour(const int hour)
 {
     return (hour >= 0 && hour < 24);
 }
 
-int isValidMinute(const int minute)
+bool isValidMinute(const int minute)
 {
     return (minute >= 0 && minute < 60);
 }
 
-int isValidDate(const Date d)
+bool isValidDate(const Date d)
 {
-    return ( isValidYear(d.year) && isValidMonth(d.month) && isValidDay(d.day, d.month) );
+    return ( isValidYear(d.year) && isValidMonth(d.month) && isValidDay(d.day, d.month, d.year) );
 }
 
-int isValidTime(const Time t)
+bool isValidTime(const Time t)
 {
     return ( isValidHour(t.hour) && isValidMinute(t.minute) );
 }
 
-int isValidDateTime(const DateTime dt)
+bool isValidDateTime(const DateTime dt)
 {
     return ( isValidDate(dt.date) && isValidTime(dt.time) );
 }
 
-int isValidVEvent(const VEvent ve)
+bool isValidVEvent(const VEvent ve)
 {
     return
         ( 
@@ -403,7 +414,7 @@ int isValidVEvent(const VEvent ve)
         );
 }
 
-RELATIVEDATE compareDateTime(const DateTime dt1, const DateTime dt2)
+RelativeDate compareDateTime(const DateTime dt1, const DateTime dt2)
 {
     if ( !isValidDateTime(dt1) || !isValidDateTime(dt2) )
     {
@@ -435,7 +446,7 @@ RELATIVEDATE compareDateTime(const DateTime dt1, const DateTime dt2)
     }
 }
 
-RELATIVEDATE compareDate(const Date d1, const Date d2)
+RelativeDate compareDate(const Date d1, const Date d2)
 {
    if (!isValidDate(d1) || !isValidDate(d2))
    {
@@ -478,7 +489,7 @@ RELATIVEDATE compareDate(const Date d1, const Date d2)
    }
 }
 
-RELATIVEDATE compareTime(const Time t1, const Time t2)
+RelativeDate compareTime(const Time t1, const Time t2)
 {
     if (!isValidTime(t1) || !isValidTime(t2))
     {
@@ -551,7 +562,7 @@ int myatoi(const char* str, int* out) // TODO CREDIT THIS FUNCTION TO "https://s
     return 1;
 }
 
-int promptYN(char* message, ...) // TODO is this needed?
+bool promptYN(char* message, ...) // TODO is this needed?
 {
     assert(message != NULL);
 
@@ -589,7 +600,7 @@ int promptYN(char* message, ...) // TODO is this needed?
     }
 }
 
-int compareVEvent(const VEvent ve1, const VEvent ve2)
+bool compareVEvent(const VEvent ve1, const VEvent ve2)
 {
     return
         (
@@ -702,12 +713,12 @@ DateTime addDaysToDateTime(const DateTime from, const int days)
     return dt;
 }
 
-int monthOverflows(const int month)
+bool monthOverflows(const int month)
 {
     return (month > 12);
 }
 
-int dayOverflows(const int day, const int month, const int year)
+bool dayOverflows(const int day, const int month, const int year)
 {
     if (isLeapYear(year))
     {
@@ -715,7 +726,7 @@ int dayOverflows(const int day, const int month, const int year)
         {
             if (day > 29)
             {
-                return 1;
+                return true;
             }
         }
     }
@@ -723,31 +734,11 @@ int dayOverflows(const int day, const int month, const int year)
     return (day > monthLength[month - 1]);
 }
 
-void printVEventWCount(const VEvent ve, const int no)
+void printVEvent(const VEvent ve, const int count)
 {
-    int width = strlen(LONGESTPROPERTY) + 1;
+    int width = (count) ? (strlen(LONGESTPROPERTY) + 1) : strlen(LONGESTPROPERTY); 
     
-    printf("\n| VEVENT %02d |\n", no);
-    printf("%*s %04d/%02d/%02d %02d.%02d [Z]\n",
-            width, "Start:",
-            ve.start.date.year, ve.start.date.month, ve.start.date.day,
-            ve.start.time.hour, ve.start.time.minute);
-    printf("%*s %04d/%02d/%02d %02d.%02d [Z]\n",
-            width, "End:",
-            ve.end.date.year, ve.end.date.month, ve.end.date.day,
-            ve.end.time.hour, ve.end.time.minute);
-    printf("%*s %s\n", width, "Summary:", ve.summary);
-    printf("%*s %s\n", width, "Location:", ve.location);
-    printf("%*s %s\n", width, "Description:", ve.description);
-    printf("%*s %d\n", width, "Priority:", ve.priority);
-    printf("\n");
-}
-
-void printVEvent(const VEvent ve)
-{
-    int width = strlen(LONGESTPROPERTY);
-    
-    printf("\n| VEVENT |\n");
+    printf((count) ? "\n| VEVENT %02d |\n" : "\n| VEVENT |\n", count);
     printf("%*s %04d/%02d/%02d %02d.%02d [Z]\n",
             width, "Start:",
             ve.start.date.year, ve.start.date.month, ve.start.date.day,
@@ -786,7 +777,7 @@ MYERRNO parseDateTime(DateTime* dest, const char* year, const char* month, const
     {
         return FAIL_INVALID_MONTH;
     }
-    else if ( !isValidDay(dest->date.day, dest->date.month) )
+    else if ( !isValidDay(dest->date.day, dest->date.month, dest->date.day) )
     {
         return FAIL_INVALID_DAY;
     }
@@ -813,7 +804,7 @@ void printDayHeader(const Date day)
     printf("\n");
 }
 
-void printMonthHeader(const Date month)
+void printMonthHeader(const Date month) // TODO generic to all these
 {
     assert(isValidDate(month));
 
@@ -824,6 +815,20 @@ void printMonthHeader(const Date month)
     printf("\n");
 }
 
+void printMonthTitle(const int month, const int width, const char borderChar)
+{
+    assert(month > 0 && month <= 12);
+
+    int mid = width / 2;
+
+    putchar(borderChar);
+    printSep(' ', ((mid - 2) - (mid % 2)), false);
+    printf("%s", monthTitles[month - 1]);
+    printSep(' ', (mid - 2), false);
+    putchar(borderChar);
+}
+    
+
 void printHourHeader(const int hour)
 {
     assert(isValidHour(hour));
@@ -831,19 +836,23 @@ void printHourHeader(const int hour)
     printf("<--- %02d h --->\n", hour);
 }
 
-void printSep(const int n)
+void printSep(const char sepChar, const int n, bool lineBreak)
 {
     for (int i = 0; i < n; ++i)
     {
-        putchar('-');
+        putchar(sepChar);
     }
-    putchar('\n');
+    
+    if (lineBreak)
+    {
+        putchar('\n');
+    }
 }
 
-int zellerToISO(const Date day)
+int zellerToISO(const Date d)
 {
     // check for incorrect parameters
-    assert(isValidDate(day));
+    assert(isValidDate(d));
 
     /* Zeller's original congruence:
      * h = ( q + FLOOR((13(m+1))/(5)) + K + FLOOR(K/4) + FLOOR(J/4) - 2J ) % 7
@@ -863,70 +872,109 @@ int zellerToISO(const Date day)
      *  d = ( (h + 5) % 7 ) + 1
      */
 
-    int d; // future return value
-    int h;
-    int q = day.day;
-    int m = (day.month > 2) ? day.month : (day.month + 2);
-    int K = (day.year % 100);
-    int J = (day.year / 100);
+    int year = d.year;
+    int month = d.month;
+    int day = d.day;
+
+    int rv; // future return value
+    int h; // zeller value in original 'format'
+    int q = day;
+    int m; // gets value below
+    if (month > 2)
+    {
+        m = month;
+    }
+    else
+    {
+        m = (month + 12);
+        --year; // month trated as extra month of previous year
+    }
+    int K = (year % 100);
+    int J = (year / 100);
     
-    h = ((q + (13*(m+1))/(5) + K + K/4 + J/4 - 2*J ) % 7);
-    d = (( (h+5) % 7) + 1);
+    h = ((q + (13*(m+1))/(5) + K + K/4 + J/4 + 5*J ) % 7);
+    rv = (( (h+5) % 7) + 1);
     
-    return d;
+    return rv;
 }
 
 void printMonth(Date month, const Calendar* cal)
 {
     assert(isValidDate(month));
+    
+    /* Make sure we start on the first day */
     month.day = 1;
     
+    /* Print header */
     printMonthHeader(month);
 
+    /* Find out what day the first day is (MON, TUE... represented as int) */
     int firstDay = zellerToISO(month);
 
+    /* Set number of leading spaces in first row (days of previous month) */
     int leadingSpaces = firstDay - 1;
 
-    char days[7] = {'M', 'T', 'W', 'T', 'F', 'S', 'S'};
-
+    /* Print day letters (stored in global array) */
     for (int i = 0; i < 7; ++i)
     {
         printf("%2c", days[i]);
         printf(" ");
     }
 
+    /* Print separator line */
     printf("\n");
-    printSep( (7*2) + 7 - 1);
+    printSep( '-', ((7*2) + 7 - 1),  true); // two for each day + 7 for each space -1 for better looks
     
+    /* Print leading spaces */
     for (int i = 0; i < leadingSpaces; ++i)
     {
         printf("  "); // leave day blank
-        printf(" "); // space between events
+        printf(" "); // space between days
     }
 
+    /* Traverse calendar until month is reached */
     VEventNode* traveller = cal->first->next;
-    while (traveller != cal->last && compareDate(traveller->ve.start.date, month) == BEFORE) // traverse calendar until month
+    while ((traveller != cal->last) && (compareDate(traveller->ve.start.date, month) == BEFORE))
     {
         traveller = traveller->next;
     }
     
-    for (int i = 1, j = 1; i <= monthLength[month.month - 1]; ++i)
+    /* Print actual table and every time there's a line break, print event indicators in next line */
+    int nOfDays;
+    if (isLeapYear(month.year))
     {
-        printf("%2d", i);
-        printf(" ");
+        nOfDays = 29;
+    }
+    else
+    {
+        nOfDays = monthLength[month.month - 1];
+    }
+    for (int i = 1, j = 1; i <= nOfDays; ++i)
+    {
+        printf("%2d", i); // print day no
+        printf(" "); // space between days
         
-        if ((i + leadingSpaces) % 7 == 0)
+        if ((i + leadingSpaces) % 7 == 0) // line break condition
         {
             printf("\n");
-            while (traveller != cal->last && j <= i)
+            while (traveller != cal->last && j <= i) // traverse calendar until last day printed (in line above)
             {
-                if (traveller->ve.start.date.day == j++)
+                if ((traveller->ve.start.date.month == month.month) && (traveller->ve.start.date.day == j)) // event indicator condition
                 {
-                    printf("X");
+                    printf("%2c", '\''); // print event indicator
+                    printf(" "); // print space between indicators
+                    // find next event in calendar, but not on current day
+                    while (traveller->ve.start.date.day == j)
+                    {
+                        traveller = traveller->next;
+                    }
                 }
-                //itraveller = traveller->next;
-                //
-                //TODO finish 
+                else
+                {
+                    printf("  "); // leave space blank
+                    printf(" "); //space between indicators
+                }
+                ++j;
             }
             printf("\n");
         }
@@ -934,3 +982,212 @@ void printMonth(Date month, const Calendar* cal)
 
     printf("\n");
 }
+
+int nthDigit(int num, int n)
+{
+    return ( (num % (int) pow(10, n)) / (int) pow(10, n-1) );
+}
+
+void printYearHeader(const int year, const int spacing, const int layoutWidth, const char thickChar, const char thinChar) // layout width = number of months in a row
+{
+    int length = ((layoutWidth * ((7*2) + 6 + 2)) + ((layoutWidth - 1) * spacing));
+    int mid = length / 2;
+
+    putchar('\n');
+    printSep(thickChar, length, true);
+    for (int i = 0; i < (mid - 4); ++i)
+    {
+        putchar(thinChar);
+    }
+    printf(" %d %d %d %d ", nthDigit(year, 4), nthDigit(year, 3), nthDigit(year, 2), nthDigit(year, 1));
+    for (int i = 0; i < (mid - 4 - !(length % 2)); ++i)
+    {
+        putchar(thinChar);
+    }
+    putchar('\n');
+    printSep(thickChar, length, false);
+    putchar('\n');
+}
+
+void printYear(Date date, int layoutWidth)
+{
+    assert(isValidDate(date) && (layoutWidth >= 1) && (layoutWidth <= 4));
+
+    int year = date.year;
+    int layoutHeight = 12 / layoutWidth;
+
+    /* Unfortunately, the only viable way is to create a temporary
+     * struct type (monthTable_s) and an array of these (monthTables)
+     * Then using multiple nested loops, we print these tables row by row
+     */
+
+    /* Defining temporary structure and creating an array of it */
+    struct monthTable_s {
+        int month;
+        int table[6][7];
+    };
+
+    struct monthTable_s monthTables[12] = { 0 }; // initialise to 0 so that we are able to skip filling zeroes
+
+    /* Filling array of tables (same algorithm as in printMonth) */
+    for (int i = 1; i <= 12; ++i)
+    {
+        // n-th month
+        monthTables[i-1].month = i;
+        // filling table using algorithm
+        int firstDay = zellerToISO((Date) {.year = year, .month = i, .day = 1}); // compound literal (C99)
+        int leadingSpaces = (firstDay - 1);
+        int vloc = 0; // vertical cursor position
+        int hloc = 0; // horizontal cursor position
+        // leading spaces are now represented as 0's
+        for (vloc = 0; vloc < leadingSpaces; ++vloc)
+        {
+            ; // empty loop
+        }
+
+        int nOfDays;
+        if (isLeapYear(year) && (i == 2))
+        {
+            nOfDays = 29;
+        }
+        else
+        {
+            nOfDays = monthLength[i-1];
+        }
+
+        for (int j = 1; j <= nOfDays; ++j)
+        {
+            monthTables[i-1].table[hloc][vloc++] = j;
+
+            if ((j + leadingSpaces % 7) == 0)
+            {
+                ++hloc;
+                hloc = 0;
+            }
+        }
+    }
+
+    /* --- */
+
+    /* Tables created; Print things */
+    int monthWidth = ((7*2) + 6 + 2); // (7*2): 2 characters for each day; (6): spaces; (2): borders
+    int spacing = 5;
+    int monthCount_title = 1;
+    int monthCount_table = 0;
+    
+    char thinChar = '-';
+    char thickChar = '=';
+    char borderChar = '|';
+    char space = ' ';
+
+    // header
+    putchar('\n');
+    printYearHeader(year, spacing, layoutWidth, thickChar, thinChar);
+    putchar('\n');
+    
+    // ugly nested loops (they work though  ^^)
+    for (int i = 0; i < layoutHeight; ++i)
+    {
+        for (int j = 0; j < layoutWidth; ++j)
+        {
+            printSep(thinChar, monthWidth, false);
+            printSep(space, spacing, false);
+        }
+        putchar('\n');
+        for (int j = 0; j < layoutWidth; ++j)
+        {
+            printMonthTitle(monthCount_title++, monthWidth, borderChar);
+            printSep(space, spacing, false);
+        }
+        putchar('\n');
+        for (int j = 0; j < layoutWidth; ++j)
+        {
+            putchar(borderChar);
+            printSep(thickChar, (monthWidth - 2), false);
+            putchar(borderChar);
+            printSep(space, spacing, false);
+        }
+        putchar('\n');
+        for (int j = 0; j < layoutWidth; ++j)
+        {
+            putchar(borderChar);
+            for (int k = 0; k < 7; ++k)
+            {
+                printf("%2c", dayLetters[k]);
+                if (k != 6)
+                {
+                    putchar(space);
+                }
+            }
+            putchar(borderChar);
+            printSep(space, spacing, false);
+        }
+        putchar('\n');
+        for (int j = 0; j < 6; ++j)
+        {
+            for (int k = 0; k < layoutWidth; ++k)
+            {
+                putchar(borderChar);
+                for (int l = 0; l < 7; ++l)
+                {
+                    if (monthTables[monthCount_table].table[j][l] == 0)
+                    {
+                        printf("%2c", space);
+                    }
+                    else
+                    {
+                        printf("%2d", monthTables[monthCount_table].table[j][l]);
+                    }
+                    
+                    if (l != 6)
+                    {
+                        putchar(space);
+                    }
+                }
+                putchar(borderChar);
+                printSep(space, spacing, false);
+                monthCount_table += 1;
+            }
+            if (j != 5)
+            {
+                putchar('\n');
+            }
+            monthCount_table -= layoutWidth;
+        }
+        putchar('\n');
+        for (int j = 0; j < layoutWidth; ++j)
+        {
+            printSep(thinChar, monthWidth, false);
+            printSep(space, spacing, false);
+        }
+
+        monthCount_table += layoutWidth;
+        putchar('\n');
+        putchar('\n');
+    }
+    putchar('\n');
+}
+
+int countVEvents(const Calendar* cal, const DateTime from, const DateTime to)
+{
+    assert(cal != NULL);
+
+    int count = 0;
+
+    /* Traverse calendar until first VEvent after $from */
+    VEventNode* traveller = cal->first->next;
+    while (traveller != cal->last && compareDateTime(traveller->ve.start, from) == BEFORE)
+    {
+        traveller = traveller->next;
+    }
+
+    /* Keep traversing until last VEvent before $to and count */
+    while (traveller != cal->last && compareDateTime(traveller->ve.start, to) == BEFORE)
+    {
+        ++count;
+        traveller = traveller->next;
+    }
+
+    return count;
+}
+

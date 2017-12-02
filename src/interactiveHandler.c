@@ -23,7 +23,11 @@ void shell(void)
     
     /* Startup actions */
     shell_say(PROGRESS, "Loading default iCalendar (%s)...", DEFAULTFILE);
-    shell_handleError(ICS_load(DEFAULTFILE, &calendar), DEFAULTFILE, 0, NULL);
+    if (!shell_handleError(ICS_load(DEFAULTFILE, &calendar), DEFAULTFILE, 0, NULL))
+    {
+        shell_say(ERROR, "Failed to load default iCalendar file. You are supposed to manually load a calendar file with 'load'. Please check 'help load' for details");
+        file = NULL;
+    }
 
     putchar('\n');
     shell_say(STATUS, "Welcome to drunt! Please enter 'help' if you are new ^( '‿' )^");
@@ -53,8 +57,8 @@ void shell(void)
 
 char* shell_readline(void)
 {
-    char* line;
-    shell_handleError(shell_readString(&line, MAX_COMMANDLENGTH), NULL, 0, line);
+    char* line = NULL;
+    shell_handleError(shell_readString(NULL, &line, MAX_COMMANDLENGTH), NULL, 0, line);
     
     return line;
 }
@@ -110,7 +114,7 @@ bool shell_execute(char** args)
     {
         if ( strcmp(args[0], commands[i]) == 0 )
         {
-            return shell_handleError((*runCommand[i])(args), NULL, 0, NULL);
+            return (*runCommand[i])(args);
         }
     }
 
@@ -210,7 +214,7 @@ MYERRNO shell_readTimestamp(DateTime* dt, TimestampType tt)
                     shell_say(ERROR, "Invalid input for month: %02d", dt->date.month);
                 }
 
-                if (!isValidDay(dt->date.day, dt->date.month))
+                if (!isValidDay(dt->date.day, dt->date.month, dt->date.year))
                 {
                     shell_say(ERROR, "Invalid input for day: %02d", dt->date.day);
                 }
@@ -235,7 +239,7 @@ MYERRNO shell_readTimestamp(DateTime* dt, TimestampType tt)
     return SUCCESS;
 }
 
-MYERRNO shell_readString(char** str, const size_t maxLength)
+MYERRNO shell_readString(const char* message, char** str, const size_t maxLength)
 {
     assert (str != NULL && maxLength != 0);
 
@@ -243,6 +247,11 @@ MYERRNO shell_readString(char** str, const size_t maxLength)
 
     do
     {
+        if (message != NULL)
+        {
+            shell_say(PROMPT, "%s:", message);
+        }
+
         if (fgets(buff, sizeof buff, stdin) == NULL)
         {
             putchar('\n');
@@ -270,7 +279,7 @@ MYERRNO shell_readString(char** str, const size_t maxLength)
     return SUCCESS;
 }
 
-MYERRNO shell_readNum(int* n)
+MYERRNO shell_readNum(const char* message, int* n)
 {
     assert(n != NULL);
 
@@ -278,6 +287,11 @@ MYERRNO shell_readNum(int* n)
 
     do
     {
+        if (message != NULL)
+        {
+            shell_say(PROMPT, "%s:", message);
+        }
+        
         if ( fgets(buff, sizeof buff, stdin) == NULL)
         {
             putchar('\n');
@@ -287,12 +301,12 @@ MYERRNO shell_readNum(int* n)
 
         removeNewLineChar(buff);
     }
-    while(sscanf(buff, "%d", &n ) != EOF);
+    while(sscanf(buff, "%d", n) == EOF);
         
     return SUCCESS;
 }
 
-bool shell_promptYN(char* message, ...) // TODO is this needed?
+bool shell_promptYN(char* message, ...)
 {
     assert(message != NULL);
 
@@ -303,36 +317,46 @@ bool shell_promptYN(char* message, ...) // TODO is this needed?
     int rc = vsnprintf(buff, sizeof buff, message, args);
     va_end(args);
 
-    if (rc == 0)
-    {
-        shell_say(WARNING, "Failed to format prompt's message! Unformatted message follows\n");
-        shell_say(PROMPT, "%s [y/n] ", message);
-    }
-    else
-    {
-        shell_say(PROMPT, "%s [y/n] ", buff);
-    }
-
-    char response = getchar();
+    char response;
 
     do
     {
+        if (rc == 0)
+        {
+            shell_say(WARNING, "Failed to format prompt's message! Unformatted message follows\n");
+            shell_say(PROMPT, "%s [y/n] ", message);
+        }
+        else
+        {
+            shell_say(PROMPT, "%s [y/n] ", buff);
+        }
+
+        response = getchar();
+        
         switch (response)
         {
             case 'y':
             case 'Y':
+                getchar(); // consume newline
                 return true;
 
             case 'n':
             case 'N':
+                getchar(); // consume newline
                 return false;
 
             default:
-                printf("Invalid choice '%c'. Please enter 'y' or 'n'\n", response);
+                shell_say(ERROR, (response == '\n') ? "Please enter 'y' or 'n'\n" : "Invalid choice '%c'. Please enter 'y' or 'n'\n", response);
+                while ((response = getchar()) != '\n')
+                {
+                    ;
+                }
                 break;
         }
     }
     while (response != 'y' && response != 'Y' && response != 'n' && response != 'N');
+
+    return false; // theoretically impossible to get here
 }
 
 bool shell_handleError(const MYERRNO error, const char* file, const int line, const char* content)
@@ -353,7 +377,7 @@ bool shell_handleError(const MYERRNO error, const char* file, const int line, co
             return false;
 
         case FAIL_FILE_REMOVE:
-            shell_say(ERROR, (file == NULL) ? "Faled to remove file" : "Failed to remove file %s", file);
+            shell_say(ERROR, (file == NULL) ? "Failed to remove file" : "Failed to remove file %s", file);
             return false;
 
         case FAIL_FILE_READ:
@@ -407,11 +431,11 @@ bool shell_handleError(const MYERRNO error, const char* file, const int line, co
         case FAIL_INVALID_YEAR:
             if (content == NULL)
             {
-                shell_say(ERROR, "Invalid year '%s' entered. Please note that drunt only processes years in range %d -- %d", content, YEAR_MIN, YEAR_MAX);
+                shell_say(ERROR, "Invalid year entered. Please note that drunt only processes years in range %d -- %d", YEAR_MIN, YEAR_MAX);
             }
             else
             {
-                shell_say(ERROR, "Invalid year entered. Please note that drunt only processes years in range %d -- %d", YEAR_MIN, YEAR_MAX);
+                shell_say(ERROR, "Invalid year '%s' entered. Please note that drunt only processes years in range %d -- %d", content, YEAR_MIN, YEAR_MAX);
             }
             return false;
 

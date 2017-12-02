@@ -16,6 +16,31 @@ static int monthLength[12] = {
     31  // dec
 };
 
+static char* monthTitles[12] = {
+    "JAN",
+    "FEB",
+    "MAR",
+    "APR",
+    "MAY",
+    "JUN",
+    "JUL",
+    "AUG",
+    "SEP",
+    "OCT",
+    "NOV",
+    "DEC"
+};
+
+static char dayLetters[7] = {
+    'M',
+    'T',
+    'W',
+    'T',
+    'F',
+    'S',
+    'S'
+};
+
 #endif
 
 

@@ -46,9 +46,9 @@ void shell_say(ShellSays, const char*, ...);
 
 MYERRNO shell_readTimestamp(DateTime*, TimestampType);
 
-MYERRNO shell_readString(char**, const size_t);
+MYERRNO shell_readString(const char*, char**, const size_t);
 
-MYERRNO shell_readNum(int*);
+MYERRNO shell_readNum(const char*, int*);
 
 bool shell_promptYN(char*, ...);
 

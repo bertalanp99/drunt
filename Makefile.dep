@@ -1,0 +1,15 @@
+obj/drunt.o: src/drunt.c src/structs.h src/enums.h src/dbHandler.h \
+ src/debug.h src/errorHandler.h src/helper.h src/interactiveHandler.h \
+ src/commandHandler.h src/arrays.h
+obj/interactiveHandler.o: src/interactiveHandler.c \
+ src/interactiveHandler.h src/structs.h src/enums.h src/errorHandler.h \
+ src/dbHandler.h src/commandHandler.h src/helper.h src/arrays.h
+obj/dbHandler.o: src/dbHandler.c src/dbHandler.h src/structs.h \
+ src/enums.h src/errorHandler.h src/helper.h
+obj/debug.o: src/debug.c src/debug.h src/structs.h src/enums.h
+obj/helper.o: src/helper.c src/helper.h src/structs.h src/enums.h \
+ src/errorHandler.h src/arrays.h
+obj/commandHandler.o: src/commandHandler.c src/commandHandler.h \
+ src/structs.h src/enums.h src/interactiveHandler.h src/errorHandler.h \
+ src/dbHandler.h src/arrays.h src/helper.h
+obj/errorHandler.o: src/errorHandler.c src/errorHandler.h
