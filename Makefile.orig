@@ -61,3 +61,11 @@ $(BINFILE): $(OFILES)
 	$(E)Linking $@
 	$(Q)$(CXX) -o $@ $(OFILES) $(LDFLAGS)
 clean:
+<<<<<<< HEAD
+	$(E)Removing files
+	$(Q)rm -f $(BINFILE) obj/* Makefile.dep
+=======
+	rm -vf drunt
+	rm -vf *.o
+	rm -vf newcal.ics
+>>>>>>> master

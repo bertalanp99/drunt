@@ -61,3 +61,5 @@ $(BINFILE): $(OFILES)
 	$(E)Linking $@
 	$(Q)$(CXX) -o $@ $(OFILES) $(LDFLAGS)
 clean:
+	$(E)Removing files
+	$(Q)rm -f $(BINFILE) obj/* Makefile.dep
