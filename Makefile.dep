@@ -1,7 +1,7 @@
-obj/GUIHandler.o: src/GUIHandler.c
+obj/GUIHandler.o: src/GUIHandler.c src/GUIHandler.h
 obj/drunt.o: src/drunt.c src/structs.h src/enums.h src/dbHandler.h \
  src/debug.h src/errorHandler.h src/helper.h src/interactiveHandler.h \
- src/commandHandler.h src/arrays.h
+ src/commandHandler.h src/arrays.h src/GUIHandler.h
 obj/interactiveHandler.o: src/interactiveHandler.c \
  src/interactiveHandler.h src/structs.h src/enums.h src/errorHandler.h \
  src/dbHandler.h src/commandHandler.h src/helper.h src/arrays.h

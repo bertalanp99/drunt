@@ -38,7 +38,8 @@ endif
 
 CC = gcc
 CXX = g++
-
+LIBS = `pkg-config --libs gtk+-3.0`
+PACKAGE = `pkg-config --cflags --libs gtk+-3.0`
 
 -include Makefile.local
 
@@ -47,7 +48,7 @@ CXX = g++
 obj/%.o: src/%.c
 	$(E)C-compiling $<
 	$(Q)if [ ! -d `dirname $@` ]; then mkdir -p `dirname $@`; fi
-	$(Q)$(CC) -o $@ -c $< $(CFLAGS)
+	$(Q)$(CC) -o $@ -c $< $(CFLAGS) $(PACKAGE)
 obj/%.o: src/%.cpp
 	$(E)C++-compiling $<
 	$(Q)if [ ! -d `dirname $@` ]; then mkdir -p `dirname $@`; fi
@@ -59,5 +60,5 @@ Makefile.dep: $(CFILES) $(CXXFILES)
 	
 $(BINFILE): $(OFILES)
 	$(E)Linking $@
-	$(Q)$(CXX) -o $@ $(OFILES) $(LDFLAGS)
+	$(Q)$(CXX) -o $@ $(OFILES) $(LDFLAGS) $(LIBS)
 clean:
