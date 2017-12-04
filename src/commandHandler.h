@@ -11,23 +11,13 @@
 #include <string.h>
 #include <assert.h>
 
-#define MAX_LINELENGTH 600
+////////////////////////
+/// GLOBAL VARIABLES ///
+////////////////////////
 
-////////////
-// ARRAYS //
-////////////
+extern size_t numberOfCommands;
 
-static char* commands[] = {
-    "help",
-    "exit",
-    "load",
-    "create",
-    "modify",
-    "delete",
-    "list"
-};
-
-static size_t numberOfCommands = ( sizeof commands / sizeof(char*) ); // TODO get rid of this
+extern char* commands[];
 
 ///////////////
 // FUNCTIONS //
@@ -46,6 +36,8 @@ int command_modify(char**);
 int command_delete(char**);
 
 int command_list(char**);
+
+int command_find(char**);
 
 ///////////////////////
 // FUNCTION POINTERS //

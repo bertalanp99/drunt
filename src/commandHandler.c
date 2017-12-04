@@ -1,9 +1,26 @@
 #include "commandHandler.h"
+#include "drunt.h"
 
 #include <time.h>
 #include <stdbool.h>
 
 #define DEFAULT_YEARLISTWIDTH 3
+#define MAX_LINELENGTH 600
+
+/////////////////////////
+/// GLOBAL VARIABLES ///
+////////////////////////
+
+char* commands[8] = {
+    "help",
+    "exit",
+    "load",
+    "create",
+    "modify",
+    "delete",
+    "list",
+    "find"
+};
 
 int (*runCommand[])(char**) = {
     &command_help,
@@ -12,8 +29,15 @@ int (*runCommand[])(char**) = {
     &command_create,
     &command_modify,
     &command_delete,
-    &command_list
+    &command_list,
+    &command_find
 };
+
+size_t numberOfCommands = ( sizeof commands / sizeof(char*) );
+
+/////////////////
+/// FUNCTIONS ///
+/////////////////
 
 int command_help(char** args) // there isn't really a way to shorten this, sorry
 {   
@@ -120,7 +144,7 @@ int command_exit(char** args)
         {
             if ( shell_handleError( ICS_write(file, &calendar, OVERWRITE), file, 0, NULL ) )
             {
-                shell_say(DONE, "Successfully saved calendar! Farewell (• ε •)");
+                shell_say(DONE, "Successfully saved calendar! Farewell; take care! :-{");
                 return 0; // EXIT
             }
             else
@@ -199,7 +223,7 @@ int command_load(char** args)
     if (args[1] == NULL)
     {
         char* path;
-        if (!shell_handleError( shell_readString("Path", &path, MAX_PATHLENGTH), path, 0, NULL ))
+        if (!shell_handleError( shell_readString("Path to file", &path, MAX_PATHLENGTH), path, 0, NULL ))
         {
             return 1;
         }
@@ -236,6 +260,8 @@ int command_load(char** args)
             shell_say(STATUS, "Successfully reloaded file %s", file);
         }
     }
+
+    shell_say(DONE, "Succesfully loaded file");
     
     /* Set file path to new path */
     char* tmp = realloc(file, sizeof(char) * (strlen(path) + 1) );
@@ -247,6 +273,8 @@ int command_load(char** args)
     }
     file = tmp;
     strcpy(file, path);
+
+    free(path);
     return 1;
 }
 
@@ -279,17 +307,21 @@ int command_create(char** args)
     
     /* NO ARGUMENTS PASSED --> Query user for each detail */
     if (args[1] == NULL)
-    {   
+    {   // TODO better method (hotfix: checking for priority validity here)
         if
             (
-                !shell_handleError( shell_readTimestamp(&ve.start, DTSTART),                            NULL, 0, NULL ) ||
-                !shell_handleError( shell_readTimestamp(&ve.end, DTEND),                                NULL, 0, NULL ) ||
-                !shell_handleError( shell_readString("Short summary", &ve.summary, MAX_LINELENGTH),    NULL, 0, NULL ) ||
-                !shell_handleError( shell_readString("Location", &ve.location, MAX_LINELENGTH),         NULL, 0, NULL ) ||
-                !shell_handleError( shell_readString("Description", &ve.description, MAX_LINELENGTH),   NULL, 0, NULL ) ||
-                !shell_handleError( shell_readNum("Priority", &ve.priority),                            NULL, 0, NULL )
+                !shell_handleError( shell_readTimestamp(&ve.start, DTSTART),                                            NULL, 0, NULL ) ||
+                !shell_handleError( shell_readTimestamp(&ve.end, DTEND),                                                NULL, 0, NULL ) ||
+                !shell_handleError( shell_readString("Short summary", &ve.summary, MAX_LINELENGTH),                     NULL, 0, NULL ) ||
+                !shell_handleError( shell_readString("Location", &ve.location, MAX_LINELENGTH),                         NULL, 0, NULL ) ||
+                !shell_handleError( shell_readString("Description", &ve.description, MAX_LINELENGTH),                   NULL, 0, NULL ) ||
+                !shell_handleError( shell_readNumWithCriterion("Priority", &ve.priority, isValidPriority), NULL, 0, NULL )
             )
         {
+            if (!isValidPriority(ve.priority))
+            {
+                shell_say(ERROR, "Invalid priority entered: '%d'. Please check 'help create' for details");
+            }
             return 1;
         }
     }
@@ -554,15 +586,243 @@ int command_create(char** args)
 
 int command_modify(char** args)
 {
-    assert(args);
-    shell_say(WARNING, "This command does nothing; it has not been implemented yet.");
+    assert(args != NULL);
+    
+    if ((args[1] == NULL) || (args[2] == NULL) || (args[3] == NULL))
+    {
+        shell_say(ERROR, "Insufficient arguments passed to 'modify'. Please check 'help modify' for more information");
+        return 1;
+    }
+    else
+    {
+        if (args[4] != NULL)
+        {
+            shell_say(ERROR, "Too many arguments passed to 'modify'. Please check 'help modify' for more information");
+            return 1;
+        }
+        
+        /* Check number of VEvents on specified day */
+        DateTime from;
+        DateTime to;
+        if
+            (
+                !shell_handleError(parseDateTime(&from, args[1], args[2], args[3], "00", "00"), NULL, 0, NULL) ||
+                !shell_handleError(parseDateTime(&to, args[1], args[2], args[3], "23", "59"), NULL, 0, NULL)
+            )
+        {
+            return 1;
+        }       
 
-    return 1;
+        int count = countVEvents(&calendar, from, to);
+        int chosenOne = -1; // initialise to impossible value
+
+        if (count == 0)
+        {
+            shell_say(STATUS, "No events found on day specified: nothing to delete");
+        }
+        else if (count == 1)
+        {
+            char* tempArgs[] = { "list", "day", args[1], args[2], args[3], NULL };
+            command_list(tempArgs);
+            shell_say(STATUS, "Only one event found on day specified. You can see it above.");
+            if (!shell_promptYN("Would you like to modify this event?"))
+            {
+                shell_say(STATUS, "Cancelled operation");
+                return 1;
+            }
+            chosenOne = 1;
+        }
+        else
+        {
+            char* tempArgs[] = { "list", "day", args[1], args[2], args[3], NULL };
+            command_list(tempArgs);
+            shell_say(STATUS, "Multiple events found on day specified. They are printed above with numbers as indices");
+            if (!shell_handleError(shell_readNum("Please enter index representing event to modify", &chosenOne), NULL, 0, 0))
+            {
+                return 1;
+            }
+            
+            if (chosenOne <= 0 || chosenOne > count)
+            {
+                shell_say(ERROR, "The number you have entered is either less than 0, equal to 0 or more than events on day specified. Cancelling operation");
+                return 1;
+            }
+        }
+
+        /* There are possibly better ways to do this, but the most robust and simple solution is to
+         * temporarily get the event structure, modify it, put it into the calendar as the new event
+         * and delete the old node from the calendar (if it really is different, Calendar_deleteVEvent() function
+         * will delete the appropriate entry) */
+        
+        /* Traverse calendar, find VEvent */
+        VEventNode* traveller = calendar.first->next;
+        while (traveller != calendar.last && compareDateTime(traveller->ve.start, from) == BEFORE)
+        {
+            traveller = traveller->next;
+        }
+        for (int i = 1; i < chosenOne; ++i)
+        {
+            traveller = traveller->next;
+        }
+        
+        VEvent old = traveller->ve;
+        VEvent new = old;
+        bool finished = false;
+
+        char* menuOptions[] = {
+            "(1) Begin (starting date)",
+            "(2) End (ending date)",
+            "(3) Summary",
+            "(4) Location",
+            "(5) Description",
+            "(6) Priority"
+        };
+        size_t nOfMenuOptions = (sizeof menuOptions / sizeof(char*));
+       
+        do
+        {
+            shell_say(NEUTRAL, "Available options:");
+            for (int i = 0; i < nOfMenuOptions; ++i)
+            {
+                shell_say(NEUTRAL, "\t%s", menuOptions[i]);
+            }
+            
+            int choice;
+            if (!shell_handleError( shell_readNumWithCriterion("Please enter your choice", &choice, isValidModifyOption), NULL, 0, NULL))
+            {
+                return 1;
+            }
+
+            switch (choice) // TODO find a solution not so primitive
+            {
+                case 1:
+                {
+                    if (!shell_handleError( shell_readTimestamp(&new.start, DTSTART), NULL, 0, NULL ))
+                    {
+                        return 1;
+                    }
+                    break;
+                }
+
+                case 2:
+                {
+                    if (!shell_handleError( shell_readTimestamp(&new.end, DTEND), NULL, 0, NULL ))
+                    {
+                        return 1;
+                    }
+                    break;
+                }
+
+                case 3:
+                {
+                    if (!shell_handleError( shell_readString("New summary", &new.summary, MAX_LINELENGTH), NULL, 0, NULL))
+                    {
+                        return 1;
+                    }
+                    break;
+                }
+                
+                case 4:
+                {
+                    if (!shell_handleError( shell_readString("New location", &new.location, MAX_LINELENGTH), NULL, 0, NULL))
+                    {
+                        return 1;
+                    }
+                    break;
+                }
+                
+                case 5:
+                {
+                    if (!shell_handleError( shell_readString("New description", &new.description, MAX_LINELENGTH), NULL, 0, NULL))
+                    {
+                        return 1;
+                    }
+                    break;
+                }
+                
+                case 6:
+                {
+                    if (!shell_handleError( shell_readNumWithCriterion("New priority", &new.priority, isValidPriority), NULL, 0, NULL))
+                    {
+                        return 1;
+                    }
+                    break;
+                }
+
+                default:
+                {
+                    shell_say(ERROR, "Something went wrong (this may be serious, report this phenomenon!)");
+                    return 1;
+                }
+            }
+
+            finished = shell_promptYN("Are you finished with editing this event?");
+        }
+        while (!finished);
+
+        shell_say(NEUTRAL, "Please check if you want to keep these modifications!");
+        shell_say(STATUS, "ORIGINAL EVENT BELOW:");
+        printVEvent(old, 0);
+        shell_say(STATUS, "NEW EVENT BELOW:");
+        printVEvent(new, 0);
+
+        bool accept = shell_promptYN("Confirm these changes and overwrite?");
+        if (!accept)
+        {
+            shell_say(STATUS, "Rolling back changes...");
+            return 1;
+        }
+
+        if (compareVEvent(new, old))
+        {
+            return 1;
+        }
+
+        bool createrc;
+        bool deleterc;
+        bool undorc;
+        deleterc = shell_handleError( Calendar_deleteVEvent(&calendar, old), NULL, 0, NULL );
+        if (deleterc)
+        {
+            createrc = shell_handleError( Calendar_addVEvent(&calendar, new), NULL, 0, NULL );
+        }
+
+        if (!deleterc)
+        {
+            shell_say(ERROR, "Failed to overwrite event. Nothing happened");
+            return 1;
+        }
+        else
+        {
+            if (!createrc)
+            {
+                shell_say(ERROR, "Successfully removed old event, but failed to add modified one.");
+                shell_say(STATUS, "Attempting to add original event again");
+                undorc = shell_handleError( Calendar_addVEvent(&calendar, old), NULL, 0, NULL );
+                if (!undorc)
+                {
+                    shell_say(ERROR, "Failed to add original event. Sorry, but it is gone and so is your modified one.");
+                    return 1;
+                }
+                else
+                {
+                    shell_say(STATUS, "At least original event could have been restored. Essentially, nothing happened");
+                    return 1;
+                }
+            }
+            else
+            {
+                shell_say(DONE, "Successfully overwritten event!");
+                return 1;
+            }
+        }
+    } 
+
 }
 
 int command_delete(char** args)
 {
-    assert(args);
+    assert(args != NULL);
     
     if ((args[1] == NULL) || (args[2] == NULL) || (args[3] == NULL))
     {
@@ -610,7 +870,7 @@ int command_delete(char** args)
         }
         else
         {
-            char* tempArgs[] = { "list", "day", args[1], args[2], args[3] };
+            char* tempArgs[] = { "list", "day", args[1], args[2], args[3], NULL };
             command_list(tempArgs);
             shell_say(STATUS, "Multiple events found on day specified. They are printed above with numbers as indices");
             if (!shell_handleError(shell_readNum("Please enter index representing event to delete", &chosenOne), NULL, 0, 0))
@@ -775,7 +1035,7 @@ int command_list(char** args)
                 isAtNewHour = false;
             }
             
-            printVEvent(traveller->ve, count);
+            printVEvent(traveller->ve, count++);
             traveller = traveller->next;
         }
 
@@ -858,5 +1118,151 @@ int command_list(char** args)
         return 1;
     }
 
+    return 1;
+}
+
+int command_find(char** args) // TODO multiple word search
+{
+    assert(args != NULL);
+
+    if (args[1] == NULL)
+    {
+        shell_say(ERROR, "Insufficient arguments passed to 'find'. Please check 'help find' for more information");
+        return 1;
+    }
+    
+    int count = 1;
+    char pattern[BUFSIZ] = "";
+    while (args[count] != NULL)
+    {
+        strncat(pattern, args[count], strlen(args[count]));
+        strncat(pattern, " ", 1); // spaces
+        ++count;
+    }
+    if (pattern[strlen(pattern) - 1] == ' ') // remove extra space
+    {
+        pattern[strlen(pattern) - 1] = '\0';
+    }
+
+    if (count != 1)
+    {
+        if (pattern[0] != '\'' || pattern[strlen(pattern) - 1] != '\'')
+        {
+            shell_say(ERROR, "Argument not bounded by apostrophes. Please enter argument like this: 'my arg'");
+            return 1;
+        }
+        else
+        { // get rid of apostrophes
+            memmove(pattern, (pattern + 1), strlen(pattern));
+            pattern[strlen(pattern) - 1] = '\0';
+        }
+    }
+    else
+    {
+        strncpy(pattern, args[1], strlen(args[1]));
+    }
+
+    count = 0; // reset and use for something else
+    VEvent** matches = malloc( sizeof(VEvent*) );
+    if (matches == NULL)
+    {
+        shell_say(ERROR, "Failed to allocate memory for array that would have contained matches!");
+        return 1;
+    }
+
+    int patternLength = strlen(pattern);
+    
+    VEventNode* traveller = calendar.first->next;
+    while (traveller != calendar.last)
+    {
+        int summaryLength = strlen(traveller->ve.summary);
+        int locationLength = strlen(traveller->ve.location);
+        int descriptionLength = strlen(traveller->ve.description);
+
+        for (int i = 0; i < summaryLength; ++i)
+        {
+            if (patternLength <= summaryLength && strncmp((traveller->ve.summary + i), pattern, patternLength) == 0)
+            {
+                if (count == 0)
+                {
+                    matches[count] = &(traveller->ve);
+                    ++count;
+                }
+                else
+                {
+                    ++count;
+                    matches = realloc( matches, (count * sizeof(VEvent*)) );
+                    if (matches == NULL)
+                    {
+                        shell_say(ERROR, "Failed to reallocate memory for array that would have contained matches!");
+                        return 1;
+                    }
+                    matches[count-1] = &(traveller->ve);
+                }
+            }
+        }
+        for (int i = 0; i < locationLength; ++i)
+        {
+            if (patternLength < locationLength && strncmp((traveller->ve.location + i), pattern, patternLength) == 0)
+            {
+                if (count == 0)
+                {
+                    matches[count] = &(traveller->ve);
+                    ++count;
+                }
+                else
+                {
+                    ++count;
+                    matches = realloc( matches, (count * sizeof(VEvent*)) );
+                    if (matches == NULL)
+                    {
+                        shell_say(ERROR, "Failed to reallocate memory for array that would have contained matches!");
+                        return 1;
+                    }
+                    matches[count-1] = &(traveller->ve);
+                }
+            }
+        }
+        for (int i = 0; i < descriptionLength; ++i)
+        {
+            if (patternLength < descriptionLength && strncmp((traveller->ve.description + i), pattern, patternLength) == 0)
+            {
+                if (count == 0)
+                {
+                    matches[count] = &(traveller->ve);
+                    ++count;
+                }
+                else
+                {
+                    ++count;
+                    matches = realloc( matches, (count * sizeof(VEvent*)) );
+                    if (matches == NULL)
+                    {
+                        shell_say(ERROR, "Failed to reallocate memory for array that would have contained matches!");
+                        return 1;
+                    }
+                    matches[count-1] = &(traveller->ve);
+                }
+            }
+        }
+
+        traveller = traveller->next;
+    }
+
+    if (count == 0)
+    {
+        shell_say(DONE, "No results for '%s'", pattern);
+        return 1;
+    }
+    
+    shell_say(PROGRESS, "Printing results for '%s'...", pattern);
+    for (int i = 0; i < count; ++i)
+    {
+        printVEvent(*(matches[i]), (i + 1)); 
+    }
+
+    free(matches);
+
+    shell_say(DONE, "Finished printing results");
     return 1;
 }

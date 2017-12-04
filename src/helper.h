@@ -102,4 +102,6 @@ void printYear(Date, const int);
 
 int countVEvents(const Calendar*, const DateTime, const DateTime);
 
+bool isValidModifyOption(const int);
+
 #endif

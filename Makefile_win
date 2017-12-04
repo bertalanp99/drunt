@@ -9,12 +9,11 @@ else
 endif
 
 CFILES := $(shell find src -mindepth 1 -maxdepth 4 -name "*.c")
-CXXFILES := $(shell find src -mindepth 1 -maxdepth 4 -name "*.cpp")
 
-INFILES := $(CFILES) $(CXXFILES)
+INFILES := $(CFILES) 
 
-OBJFILES := $(CXXFILES:src/%.cpp=%) $(CFILES:src/%.c=%)
-DEPFILES := $(CXXFILES:src/%.cpp=%) $(CFILES:src/%.c=%)
+OBJFILES := $(CFILES:src/%.c=%)
+DEPFILES := $(CFILES:src/%.c=%)
 OFILES := $(OBJFILES:%=obj/%.o)
 
 BINFILE = drunt
@@ -26,7 +25,6 @@ ifdef DEBUG
 	COMMONFLAGS := $(COMMONFLAGS) -g
 endif
 CFLAGS = $(COMMONFLAGS) --std=c99
-CXXFLAGS = $(COMMONFLAGS) --std=c++0x
 DEPDIR = deps
 all: $(BINFILE)
 ifeq ($(MAKECMDGOALS),)
@@ -36,8 +34,7 @@ ifneq ($(filter-out clean, $(MAKECMDGOALS)),)
 -include Makefile.dep
 endif
 
-CC = gcc
-CXX = g++
+CC = i686-w64-mingw32-gcc
 LIBS = `pkg-config --libs gtk+-3.0`
 PACKAGE = `pkg-config --cflags --libs gtk+-3.0`
 
@@ -49,14 +46,6 @@ obj/%.o: src/%.c
 	$(E)C-compiling $<
 	$(Q)if [ ! -d `dirname $@` ]; then mkdir -p `dirname $@`; fi
 	$(Q)$(CC) -o $@ -c $< $(CFLAGS) $(PACKAGE)
-obj/%.o: src/%.cpp
-	$(E)C++-compiling $<
-	$(Q)if [ ! -d `dirname $@` ]; then mkdir -p `dirname $@`; fi
-	$(Q)$(CXX) -o $@ -c $< $(CXXFLAGS)
-Makefile.dep: $(CFILES) $(CXXFILES)
-	$(E)Depend
-	$(Q)for i in $(^); do $(CXX) $(CXXFLAGS) -MM "$${i}" -MT obj/`basename $${i%.*}`.o; done > $@
-
 	
 $(BINFILE): $(OFILES)
 	$(E)Linking $@

@@ -3,6 +3,8 @@
 
 #include "enums.h"
 
+#include <gtk/gtk.h>
+
 /* Date & Time */
 
 typedef struct {
@@ -21,7 +23,7 @@ typedef struct {
     Time time;
 } DateTime;
 
-/* Events */
+/* Databases */
 
 typedef struct {
     DateTime start;
@@ -31,13 +33,6 @@ typedef struct {
     char* description;
     int priority;
 } VEvent;
-
-//typedef struct {
-//    char longName[10];
-//    char shortName[4];
-//} MonthName; // TODO do I really need this?
-
-/* Databases */
 
 typedef struct VEventNode_s {
     VEvent ve;
@@ -51,6 +46,25 @@ typedef struct {
     VEventNode* last;
 } Calendar;
 
+/* GTK */
+
+typedef struct {
+    GtkWidget* yearFrom;
+    GtkWidget* yearTo;
+    GtkWidget* monthFrom;
+    GtkWidget* monthTo;
+    GtkWidget* dayFrom;
+    GtkWidget* dayTo;
+    GtkWidget* hourFrom;
+    GtkWidget* hourTo;
+    GtkWidget* minuteFrom;
+    GtkWidget* minuteTo;
+    GtkWidget* summary;
+    GtkWidget* location;
+    GtkWidget* description;
+    GtkWidget* priority;
+} newEvent_inputData;
+
 /* Misc */
 
 typedef struct {
@@ -58,12 +72,5 @@ typedef struct {
     ICSDataType type;
     int flag;
 } ICSTag;
-
-typedef struct {
-    MYERRNO rc;
-    char* path;
-    int line;
-    char* content;
-} ErrProps;
 
 #endif

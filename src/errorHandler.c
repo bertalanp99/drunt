@@ -5,12 +5,10 @@
 #include <stdlib.h>
 #include <stdarg.h>
 
-#define BUFFSIZE 256
-
 void die(const char* message, ...)
 {
     /* Handle parameters */
-    char buff[BUFFSIZE];
+    char buff[BUFSIZ];
     va_list args;
     va_start(args, message);
     int rc = vsnprintf(buff, sizeof buff, message, args);
@@ -36,7 +34,7 @@ void die(const char* message, ...)
 void warning(const char* message, ...)
 {
     /* Handle parameters */
-    char buff[BUFFSIZE];
+    char buff[BUFSIZ];
     va_list args;
     va_start(args, message);
     int rc = vsnprintf(buff, sizeof buff, message, args);

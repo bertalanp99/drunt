@@ -1,7 +1,6 @@
 #include "helper.h"
 #include "errorHandler.h"
 #include "enums.h"
-#include "arrays.h"
 
 #include <stdio.h>
 #include <stdbool.h>
@@ -17,9 +16,56 @@
 #define YEAR_MIN 1950
 #define YEAR_MAX 2050
 
-#define BUFFSIZE 1024
 #define MAX_LINELENGTH 600 // 75 octets
 #define LONGESTPROPERTY "Description"
+
+////////////////////////
+/// GLOBAL VARIABLES ///
+////////////////////////
+
+static int monthLength[12] = {
+    31, // jan
+    28, // feb
+    31, // mar
+    30, // apr
+    31, // may
+    30, // jun
+    31, // jul
+    31, // aug
+    30, // sep
+    31, // oct
+    30, // nov
+    31  // dec
+};
+
+static char* monthTitles[12] = {
+    "JAN",
+    "FEB",
+    "MAR",
+    "APR",
+    "MAY",
+    "JUN",
+    "JUL",
+    "AUG",
+    "SEP",
+    "OCT",
+    "NOV",
+    "DEC"
+};
+
+static char dayLetters[7] = {
+    'M',
+    'T',
+    'W',
+    'T',
+    'F',
+    'S',
+    'S'
+};
+
+/////////////////
+/// FUNCTIONS ///
+/////////////////
 
 int isLeapYear(const int year)
 {
@@ -50,7 +96,7 @@ MYERRNO ICSVEventCounter(const char* file, int* n)
     }
 
     /* Counting only BEGIN:VEVENT lines is safe because ICS validity has already been checked */
-    char buff[BUFFSIZE];
+    char buff[BUFSIZ];
     while(fgets(buff, sizeof buff, fp) != NULL)
     {
         if ( !strcmp(buff, "BEGIN:VEVENT\n") || !strcmp(buff, "BEGIN:VEVENT\r\n") )
@@ -83,7 +129,7 @@ bool isValidICS(const char* file)
      * for a closing END at heads of lines. If no END is found or another BEGIN of same
      * type is found, the ICS file is corrupt */
 
-    char buff[BUFFSIZE];
+    char buff[BUFSIZ];
     int currentLine = -1;
  
     ICSTag tags[] = {
@@ -567,7 +613,7 @@ bool promptYN(char* message, ...) // TODO is this needed?
     assert(message != NULL);
 
     /* Handle parameters */
-    char buff[BUFFSIZE];
+    char buff[BUFSIZ];
     va_list args;
     va_start(args, message);
     int rc = vsnprintf(buff, sizeof buff, message, args);
@@ -1189,5 +1235,10 @@ int countVEvents(const Calendar* cal, const DateTime from, const DateTime to)
     }
 
     return count;
+}
+
+bool isValidModifyOption(const int c)
+{
+    return (c == 'b' || c == 'e' || c == 's' || c == 'l' || c == 'd' || c == 'p');
 }
 

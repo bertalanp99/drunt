@@ -5,7 +5,6 @@
 #include "errorHandler.h"
 #include "dbHandler.h"
 #include "commandHandler.h"
-#include "arrays.h"
 #include "enums.h"
 
 #include <stdio.h>
@@ -16,20 +15,13 @@
 #include <stdbool.h>
 
 #define MAX_PATHLENGTH 128
-#define DEFAULTFILE "calendar.ics"
-#define BUFFSIZE 512
 #define MAX_COMMANDLENGTH 256
 #define TOKEN_BUFFSIZE 64
 #define MAX_TOKEN_NUMBER 16
 #define TOKEN_DELIMITER " \t\r\n"
 
-///////////////////////
-// GLOBALS VARIABLES //
-///////////////////////
-
-Calendar calendar;
-char* file;
-
+#define YEAR_MIN 1950
+#define YEAR_MAX 2050
 ///////////////
 // FUNCTIONS //
 ///////////////
@@ -49,6 +41,8 @@ MYERRNO shell_readTimestamp(DateTime*, TimestampType);
 MYERRNO shell_readString(const char*, char**, const size_t);
 
 MYERRNO shell_readNum(const char*, int*);
+
+MYERRNO shell_readNumWithCriterion(const char*, int*, bool (*criterion)(int));
 
 bool shell_promptYN(char*, ...);
 

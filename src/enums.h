@@ -2,30 +2,6 @@
 #define ENUMS_H__
 
 typedef enum {
-    jan,
-    feb,
-    mar,
-    apr,
-    may,
-    jun,
-    jul,
-    aug,
-    sep,
-    oct,
-    nov,
-    dec
-} Month; 
-
-// ---------------------
-
-typedef enum {
-    Short,
-    Long
-} Format;
-
-/* Misc */
-
-typedef enum {
     SUCCESS,
     FAIL_UNDERFLOW,
     FAIL_OVERFLOW,

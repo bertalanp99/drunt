@@ -1,3 +1,4 @@
+#include "drunt.h"
 #include "interactiveHandler.h"
 
 #define YEAR_MIN 1950
@@ -9,28 +10,8 @@
 
 void shell(void)
 {
-    /* Initialise empty calendar */
-    Calendar_create(&calendar);
-
-    /* Set default file */
-    char* tmps = malloc( sizeof(char) * (strlen(DEFAULTFILE) + 1) );
-    if (!tmps)
-    {
-        die("Failed to allocate memory for default filename (%s)", DEFAULTFILE);
-    }
-    strcpy(tmps, DEFAULTFILE);
-    file = tmps;
-    
-    /* Startup actions */
-    shell_say(PROGRESS, "Loading default iCalendar (%s)...", DEFAULTFILE);
-    if (!shell_handleError(ICS_load(DEFAULTFILE, &calendar), DEFAULTFILE, 0, NULL))
-    {
-        shell_say(ERROR, "Failed to load default iCalendar file. You are supposed to manually load a calendar file with 'load'. Please check 'help load' for details");
-        file = NULL;
-    }
-
     putchar('\n');
-    shell_say(STATUS, "Welcome to drunt! Please enter 'help' if you are new ^( '‿' )^");
+    shell_say(STATUS, "Welcome to drunt! Please enter 'help' if you are new (^ v ^)");
     
     /* Shell handling */
     char* line;
@@ -52,7 +33,8 @@ void shell(void)
     }
     while (status);
 
-    Calendar_destroy(&calendar);
+    shell_say(NEUTRAL, "Good-bye :-{");
+    return;
 }
 
 char* shell_readline(void)
@@ -127,7 +109,7 @@ void shell_say(ShellSays ss, const char* message, ...)
     assert(message != NULL);
 
     /* Handle parameters */
-    char buff[BUFFSIZE];
+    char buff[BUFSIZ];
     va_list args;
     va_start(args, message);
     int rc = vsnprintf(buff, sizeof buff, message, args);
@@ -178,7 +160,7 @@ MYERRNO shell_readTimestamp(DateTime* dt, TimestampType tt)
     assert(dt != NULL);
 
     char* type = (tt == DTSTART) ? "STARTING" : "ENDING";
-    char buff[BUFFSIZE];
+    char buff[BUFSIZ];
     bool done = true;
 
     do
@@ -243,7 +225,7 @@ MYERRNO shell_readString(const char* message, char** str, const size_t maxLength
 {
     assert (str != NULL && maxLength != 0);
 
-    char buff[BUFFSIZE];
+    char buff[BUFSIZ];
 
     do
     {
@@ -283,7 +265,7 @@ MYERRNO shell_readNum(const char* message, int* n)
 {
     assert(n != NULL);
 
-    char buff[BUFFSIZE];
+    char buff[BUFSIZ];
 
     do
     {
@@ -306,12 +288,39 @@ MYERRNO shell_readNum(const char* message, int* n)
     return SUCCESS;
 }
 
+MYERRNO shell_readNumWithCriterion(const char* message, int* n, bool (*criterion)(int))
+{
+    assert(n != NULL);
+
+    char buff[BUFSIZ];
+
+    do
+    {
+        if (message != NULL)
+        {
+            shell_say(PROMPT, "%s:", message);
+        }
+        
+        if ( fgets(buff, sizeof buff, stdin) == NULL)
+        {
+            putchar('\n');
+            shell_say(WARNING, "Received EOF, cancelling...");
+            return FAIL_EOF;
+        }
+
+        removeNewLineChar(buff);
+    }
+    while(sscanf(buff, "%d", n) == EOF && !criterion(*n));
+        
+    return SUCCESS;
+}
+    
 bool shell_promptYN(char* message, ...)
 {
     assert(message != NULL);
 
     /* Handle parameters */
-    char buff[BUFFSIZE];
+    char buff[BUFSIZ];
     va_list args;
     va_start(args, message);
     int rc = vsnprintf(buff, sizeof buff, message, args);
@@ -393,7 +402,7 @@ bool shell_handleError(const MYERRNO error, const char* file, const int line, co
             return false;
 
         case FAIL_FILE_CORRUPT:
-            shell_say(ERROR, (file == NULL) ? "File seems to be corrupt" : "File %s seems to be corrupt", file);
+            shell_say(ERROR, (file == NULL) ? "File seems to be corrupt / does not exist" : "File %s seems to be corrupt / does not exist", file);
             return false;
 
         case FAIL_FILE_EXISTS:

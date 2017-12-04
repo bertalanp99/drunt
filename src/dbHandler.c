@@ -9,7 +9,6 @@
 #include <unistd.h>
 #include <assert.h>
 
-#define BUFFSIZE 1024
 #define MAX_LINELENGTH 600 // = 75 octets --> iCalendar allows that much
 #define ICALVERSION "2.0"
 
@@ -31,7 +30,7 @@ MYERRNO ICS_load(const char* file, Calendar* cal)
         return FAIL_FILE_READ;
     }
 
-    char buff[BUFFSIZE];
+    char buff[BUFSIZ];
     int currentLine = 0;
     
     ICSTag tags[] = {
@@ -284,8 +283,6 @@ MYERRNO Calendar_addVEvent(Calendar* cal, VEvent ve)
 
     return SUCCESS;
 }
-
-// TODO VEvent finder?
 
 MYERRNO Calendar_deleteVEvent(Calendar* cal, VEvent ve)
 {
