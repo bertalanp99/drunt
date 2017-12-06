@@ -1,8 +1,30 @@
 #include "drunt.h"
 #include "interactiveHandler.h"
+#include "commandHandler.h"
 
 #define YEAR_MIN 1950
 #define YEAR_MAX 2050
+
+////////////////////////
+/// GLOBAL VARIABLES ///
+////////////////////////
+
+char* commands[8] = {
+    "help",
+    "exit",
+    "load",
+    "create",
+    "modify",
+    "delete",
+    "list",
+    "find"
+};
+
+size_t numberOfCommands = ( sizeof commands / sizeof(char*) );
+
+/////////////////
+/// FUNCTIONS ///
+/////////////////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 // The 'shell' was made following tutorial on https://brennan.io/2015/01/16/write-a-shell-in-c/ //
@@ -91,7 +113,7 @@ bool shell_execute(char** args)
     }
 
     /* Handle other commands */
-    size_t numbereOfCommands = ( sizeof commands / sizeof(char*) );
+    size_t numberOfCommands = ( sizeof commands / sizeof(char*) );
     for (int i = 0; i < numberOfCommands; ++i)
     {
         if ( strcmp(args[0], commands[i]) == 0 )

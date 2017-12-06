@@ -11,7 +11,7 @@
 /// GLOBAL VARIABLES ///
 ////////////////////////
 
-char* commands[8] = {
+/*char* commands[8] = {
     "help",
     "exit",
     "load",
@@ -20,7 +20,7 @@ char* commands[8] = {
     "delete",
     "list",
     "find"
-};
+};*/
 
 int (*runCommand[])(char**) = {
     &command_help,
@@ -32,8 +32,6 @@ int (*runCommand[])(char**) = {
     &command_list,
     &command_find
 };
-
-size_t numberOfCommands = ( sizeof commands / sizeof(char*) );
 
 /////////////////
 /// FUNCTIONS ///

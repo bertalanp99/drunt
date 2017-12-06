@@ -4,7 +4,6 @@
 #include "structs.h"
 #include "errorHandler.h"
 #include "dbHandler.h"
-#include "commandHandler.h"
 #include "enums.h"
 
 #include <stdio.h>
@@ -22,6 +21,7 @@
 
 #define YEAR_MIN 1950
 #define YEAR_MAX 2050
+
 ///////////////
 // FUNCTIONS //
 ///////////////
